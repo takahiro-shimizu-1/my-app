@@ -58,9 +58,21 @@ const STATE_TRANSITIONS: StateTransition[] = [
   },
   {
     from: 'implementing',
+    to: 'analyzing',
+    trigger: 'Retry requested',
+    action: 'Restart analysis',
+  },
+  {
+    from: 'implementing',
     to: 'reviewing',
     trigger: 'Pull request created',
     action: 'Start review',
+  },
+  {
+    from: 'reviewing',
+    to: 'analyzing',
+    trigger: 'Retry requested',
+    action: 'Restart analysis',
   },
   {
     from: 'reviewing',
@@ -85,6 +97,30 @@ const STATE_TRANSITIONS: StateTransition[] = [
     to: 'blocked',
     trigger: 'Implementation blocked',
     action: 'Escalate blocker',
+  },
+  {
+    from: 'pending',
+    to: 'failed',
+    trigger: 'Execution failed before analysis',
+    action: 'Record failure',
+  },
+  {
+    from: 'analyzing',
+    to: 'failed',
+    trigger: 'Analysis failed',
+    action: 'Record failure',
+  },
+  {
+    from: 'implementing',
+    to: 'failed',
+    trigger: 'Implementation failed',
+    action: 'Record failure',
+  },
+  {
+    from: 'reviewing',
+    to: 'failed',
+    trigger: 'Review execution failed',
+    action: 'Record failure',
   },
   {
     from: 'reviewing',
@@ -150,6 +186,10 @@ class LabelStateMachine {
 
   async transitionState(issueNumber: number, newState: State, reason?: string) {
     const currentState = await this.getIssueState(issueNumber);
+
+    if (currentState.state === newState) {
+      return;
+    }
 
     if (currentState.state) {
       const transition = STATE_TRANSITIONS.find(

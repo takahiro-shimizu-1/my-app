@@ -350,14 +350,25 @@ async function syncIssueLabels(
 }
 
 async function resolveGitHubToken() {
+  try {
+    const token = await captureCommand('gh', ['auth', 'token'], {
+      env: buildLocalGhEnv(),
+    });
+    const trimmed = token.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  } catch {
+    // Fall back to workflow-provided tokens when local gh auth is unavailable.
+  }
+
   for (const key of ['GITHUB_TOKEN', 'GH_TOKEN']) {
     if (process.env[key]) {
       return process.env[key]!;
     }
   }
 
-  const token = await captureCommand('gh', ['auth', 'token']);
-  return token.trim();
+  throw new Error('No GitHub token available. Log into `gh` on the local runner or provide GITHUB_TOKEN.');
 }
 
 async function resolveRepoInfo(): Promise<RepoInfo> {
@@ -491,6 +502,13 @@ function shellWords(command: string) {
 
 function npxCommand() {
   return process.platform === 'win32' ? 'npx.cmd' : 'npx';
+}
+
+function buildLocalGhEnv() {
+  const env = { ...process.env };
+  delete env.GITHUB_TOKEN;
+  delete env.GH_TOKEN;
+  return env;
 }
 
 async function runCommand(command: string, args: string[], options?: { env?: NodeJS.ProcessEnv }) {
