@@ -1,0 +1,2 @@
+[console_scripts]
+judgesystem = judgesystem.cli:main
