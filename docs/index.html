@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>my-app Automation Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f2efe7;
+        --ink: #122025;
+        --muted: #59717a;
+        --panel: rgba(255, 255, 255, 0.72);
+        --border: rgba(18, 32, 37, 0.08);
+        --accent: #0e8a7d;
+        --accent-soft: rgba(14, 138, 125, 0.14);
+        --warm: #e57c45;
+        --shadow: 0 20px 50px rgba(18, 32, 37, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 138, 125, 0.18), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(229, 124, 69, 0.22), transparent 24%),
+          linear-gradient(180deg, #f7f4eb 0%, var(--bg) 100%);
+      }
+
+      .shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 40px 20px 64px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        width: fit-content;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.6rem, 6vw, 5rem);
+        line-height: 0.92;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-copy {
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 1.04rem;
+        line-height: 1.7;
+      }
+
+      .meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .chip {
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.58);
+        border: 1px solid var(--border);
+        font-size: 0.9rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        grid-column: span 12;
+        padding: 22px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .card h2 {
+        margin: 0 0 14px;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat {
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid var(--border);
+      }
+
+      .stat .label {
+        font-size: 0.82rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .stat .value {
+        margin-top: 8px;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        font-weight: 700;
+      }
+
+      .wide {
+        grid-column: span 8;
+      }
+
+      .narrow {
+        grid-column: span 4;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .trend-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .trend-row {
+        display: grid;
+        grid-template-columns: 110px 1fr 90px;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .bar {
+        position: relative;
+        height: 12px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(18, 32, 37, 0.08);
+      }
+
+      .bar > span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent), var(--warm));
+      }
+
+      .mono {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .warning {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(229, 124, 69, 0.14);
+        color: #8c4a22;
+      }
+
+      .empty {
+        color: var(--muted);
+      }
+
+      @media (max-width: 900px) {
+        .wide,
+        .narrow {
+          grid-column: span 12;
+        }
+
+        .stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          padding: 28px 16px 48px;
+        }
+
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .trend-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="eyebrow">Automation telemetry</div>
+        <h1>my-app<br />Operations Board</h1>
+        <p class="hero-copy">
+          This page reads the latest automation snapshot generated by GitHub Actions and shows
+          repository health, delivery flow, and skill-bus activity for <span class="mono">my-app</span>.
+        </p>
+        <div class="meta-strip" id="meta-strip"></div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Summary</h2>
+          <div class="stats" id="summary-stats"></div>
+          <div id="warning-box"></div>
+        </article>
+
+        <article class="card wide">
+          <h2>Daily Flow</h2>
+          <div class="trend-list" id="trend-list"></div>
+        </article>
+
+        <article class="card narrow">
+          <h2>Agents / Skills</h2>
+          <div id="agent-list" class="empty">No skill-bus activity captured yet.</div>
+        </article>
+
+        <article class="card wide">
+          <h2>Dashboard Data</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody id="detail-table"></tbody>
+          </table>
+        </article>
+
+        <article class="card narrow">
+          <h2>Links</h2>
+          <table>
+            <tbody>
+              <tr>
+                <td>Repository</td>
+                <td><a href="https://github.com/takahiro-shimizu-1/my-app">GitHub</a></td>
+              </tr>
+              <tr>
+                <td>Repo Guide</td>
+                <td><a href="./repo-guide.md">repo-guide.md</a></td>
+              </tr>
+              <tr>
+                <td>Raw Data</td>
+                <td><a href="./dashboard-data.json">dashboard-data.json</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      async function main() {
+        const response = await fetch("./dashboard-data.json", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("dashboard-data.json could not be loaded");
+        }
+
+        const data = await response.json();
+        renderMeta(data);
+        renderSummary(data);
+        renderTrends(data);
+        renderAgents(data);
+        renderDetails(data);
+      }
+
+      function renderMeta(data) {
+        const meta = document.getElementById("meta-strip");
+        meta.innerHTML = [
+          chip(`Source: ${data.meta.source}`),
+          chip(`Generated: ${new Date(data.generated).toLocaleString()}`),
+          chip(`Repo: ${data.meta.owner}/${data.meta.repo}`),
+          chip(`Project #: ${data.meta.projectNumber}`),
+        ].join("");
+      }
+
+      function renderSummary(data) {
+        const summary = document.getElementById("summary-stats");
+        const items = [
+          ["Total Issues", data.summary.totalIssues],
+          ["Completed", data.summary.completedIssues],
+          ["Completion", `${data.summary.completionRate}%`],
+          ["Quality", `${data.summary.avgQualityScore}/100`],
+        ];
+
+        summary.innerHTML = items
+          .map(
+            ([label, value]) => `
+              <div class="stat">
+                <div class="label">${label}</div>
+                <div class="value">${value}</div>
+              </div>
+            `,
+          )
+          .join("");
+
+        const warningBox = document.getElementById("warning-box");
+        warningBox.innerHTML = data.meta.warning
+          ? `<div class="warning">${data.meta.warning}</div>`
+          : "";
+      }
+
+      function renderTrends(data) {
+        const trendList = document.getElementById("trend-list");
+        const maxCompleted = Math.max(1, ...data.trends.map((entry) => entry.completed));
+
+        trendList.innerHTML = data.trends
+          .map((entry) => {
+            const width = Math.max(6, (entry.completed / maxCompleted) * 100);
+            return `
+              <div class="trend-row">
+                <div class="mono">${entry.date}</div>
+                <div class="bar"><span style="width:${width}%"></span></div>
+                <div>${entry.completed} done / ${entry.inProgress} in flow</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function renderAgents(data) {
+        const agentList = document.getElementById("agent-list");
+        if (!data.agents.length) {
+          agentList.innerHTML = '<div class="empty">No skill-bus activity captured yet.</div>';
+          return;
+        }
+
+        agentList.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Done</th>
+                <th>Quality</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.agents
+                .map(
+                  (agent) => `
+                    <tr>
+                      <td>${agent.name}</td>
+                      <td>${agent.tasksCompleted}</td>
+                      <td>${agent.avgQuality}</td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function renderDetails(data) {
+        const detailTable = document.getElementById("detail-table");
+        const rows = [
+          ["Average Duration", `${data.summary.avgDuration} min`],
+          ["Total Cost", `$${data.summary.totalCost}`],
+          ["Meta Source", data.meta.source],
+          ["Repository", `${data.meta.owner}/${data.meta.repo}`],
+        ];
+
+        detailTable.innerHTML = rows
+          .map(
+            ([field, value]) => `
+              <tr>
+                <td>${field}</td>
+                <td>${value}</td>
+              </tr>
+            `,
+          )
+          .join("");
+      }
+
+      function chip(text) {
+        return `<span class="chip">${text}</span>`;
+      }
+
+      main().catch((error) => {
+        document.body.innerHTML = `
+          <main class="shell">
+            <section class="card">
+              <h2>Dashboard Error</h2>
+              <p class="warning">${error.message}</p>
+            </section>
+          </main>
+        `;
+      });
+    </script>
+  </body>
+</html>
