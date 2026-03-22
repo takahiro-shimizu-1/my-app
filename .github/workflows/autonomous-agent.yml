@@ -26,39 +26,38 @@ jobs:
     steps:
       - name: Check trigger conditions
         id: check
-        run: |
-          SHOULD_EXECUTE="false"
-          ISSUE_NUMBER=""
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let shouldExecute = false;
+            let issueNumber = '';
 
-          # Check if manually triggered
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            SHOULD_EXECUTE="true"
-            ISSUE_NUMBER="${{ github.event.inputs.issue_number }}"
-            echo "Manual trigger for issue #${ISSUE_NUMBER}"
-          fi
+            if (context.eventName === 'workflow_dispatch') {
+              shouldExecute = true;
+              issueNumber = String(context.payload.inputs?.issue_number ?? '');
+              core.notice(`Manual trigger for issue #${issueNumber}`);
+            }
 
-          # Check if issue has agent-execute label
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            LABELS='${{ toJson(github.event.issue.labels.*.name) }}'
-            if echo "$LABELS" | grep -Eq "🤖agent-execute|🤖 agent:coordinator"; then
-              SHOULD_EXECUTE="true"
-              ISSUE_NUMBER="${{ github.event.issue.number }}"
-              echo "Issue #${ISSUE_NUMBER} has agent-execute label"
-            fi
-          fi
+            if (context.eventName === 'issues') {
+              const addedLabel = context.payload.label?.name ?? '';
+              if (addedLabel === '🤖agent-execute' || addedLabel === '🤖 agent:coordinator') {
+                shouldExecute = true;
+                issueNumber = String(context.payload.issue?.number ?? '');
+                core.notice(`Issue #${issueNumber} has trigger label ${addedLabel}`);
+              }
+            }
 
-          # Check if comment contains /agent command or @miyabi mention
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            COMMENT="${{ github.event.comment.body }}"
-            if echo "$COMMENT" | grep -Eq "^/agent|@miyabi"; then
-              SHOULD_EXECUTE="true"
-              ISSUE_NUMBER="${{ github.event.issue.number }}"
-              echo "Comment triggered agent execution for issue #${ISSUE_NUMBER}"
-            fi
-          fi
+            if (context.eventName === 'issue_comment') {
+              const body = context.payload.comment?.body ?? '';
+              if (/^\/agent\b/m.test(body) || /@miyabi\b/.test(body)) {
+                shouldExecute = true;
+                issueNumber = String(context.payload.issue?.number ?? '');
+                core.notice(`Comment triggered agent execution for issue #${issueNumber}`);
+              }
+            }
 
-          echo "should_execute=${SHOULD_EXECUTE}" >> $GITHUB_OUTPUT
-          echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
+            core.setOutput('should_execute', shouldExecute ? 'true' : 'false');
+            core.setOutput('issue_number', issueNumber);
 
   # Job 2: Execute Autonomous Agents
   execute-agents:
