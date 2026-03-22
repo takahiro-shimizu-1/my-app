@@ -89,5 +89,6 @@ For the full GitHub OS automation in this repository:
 
 - `GITHUB_TOKEN` is used automatically in GitHub Actions.
 - `GH_PROJECT_TOKEN` is optional but required for Projects V2 sync/update.
-- `ANTHROPIC_API_KEY` is required for GitHub-side autonomous code generation.
+- autonomous code generation runs on a self-hosted PC runner with local `claude auth login`, so `ANTHROPIC_API_KEY` is not required in the default setup.
 - `PROJECT_NUMBER` defaults to `1` if you do not set a repo variable.
+- the self-hosted runner must be online with the label `my-app-local`.

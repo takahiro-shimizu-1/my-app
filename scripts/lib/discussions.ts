@@ -12,6 +12,22 @@ interface DiscussionCategory {
   emoji: string;
 }
 
+interface InitializeQueryResult {
+  repository: {
+    id: string;
+    hasDiscussionsEnabled: boolean;
+    discussionCategories: {
+      nodes: DiscussionCategory[];
+    };
+  };
+}
+
+interface CreateDiscussionMutationResult {
+  createDiscussion: {
+    discussion: CreatedDiscussion;
+  };
+}
+
 export interface CreatedDiscussion {
   id: string;
   number: number;
@@ -52,7 +68,7 @@ export class DiscussionsClient {
       }
     `;
 
-    const result: any = await this.graphqlClient(query, {
+    const result = await this.graphqlClient<InitializeQueryResult>(query, {
       owner: this.config.owner,
       repo: this.config.repo,
     });
@@ -109,7 +125,7 @@ export class DiscussionsClient {
       }
     `;
 
-    const result: any = await this.graphqlClient(mutation, {
+    const result = await this.graphqlClient<CreateDiscussionMutationResult>(mutation, {
       repositoryId: this.repositoryId,
       categoryId: input.categoryId,
       title: input.title,

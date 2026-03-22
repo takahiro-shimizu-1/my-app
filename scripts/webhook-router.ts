@@ -49,7 +49,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPOSITORY = process.env.GITHUB_REPOSITORY || 'ShunsukeHayashi/Autonomous-Operations';
 const [owner, repo] = REPOSITORY.split('/');
 
-const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null as any;
+const octokit: Octokit | null = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null;
 
 const RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
@@ -220,6 +220,11 @@ class WebhookEventRouter {
   }
 
   private async createRoutingComment(issueNumber: number, agent: string, action: string): Promise<void> {
+    if (!octokit) {
+      console.warn('Skipping routing comment because GITHUB_TOKEN is not configured.');
+      return;
+    }
+
     const body = `## Event Router
 
 **Agent**: ${agent}

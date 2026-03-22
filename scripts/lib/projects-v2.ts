@@ -41,6 +41,59 @@ interface CustomField {
   }>;
 }
 
+interface ProjectInitializationResult {
+  repository: {
+    projectV2: {
+      id: string;
+      title: string;
+    } | null;
+  };
+}
+
+interface AddProjectItemResult {
+  addProjectV2ItemById: {
+    item: {
+      id: string;
+    };
+  };
+}
+
+interface ProjectFieldsResult {
+  node: {
+    fields: {
+      nodes: CustomField[];
+    };
+  };
+}
+
+interface ProjectItemsResult {
+  node: {
+    items: {
+      nodes: ProjectItem[];
+    };
+  };
+}
+
+interface ContentNodeResult {
+  repository: {
+    issue?: {
+      id: string;
+    } | null;
+    pullRequest?: {
+      id: string;
+    } | null;
+  };
+}
+
+interface ProjectFieldValueNode {
+  field: {
+    name: string;
+  };
+  text?: string;
+  number?: number;
+  name?: string;
+}
+
 export class ProjectsV2Client {
   private graphqlClient: typeof graphql;
   private config: ProjectV2Config;
@@ -69,16 +122,21 @@ export class ProjectsV2Client {
     `;
 
     try {
-      const result: any = await this.graphqlClient(query, {
+      const result = await this.graphqlClient<ProjectInitializationResult>(query, {
         owner: this.config.owner,
         repo: this.config.repo,
         projectNumber: this.config.projectNumber,
       });
 
+      if (!result.repository.projectV2) {
+        throw new Error(`Project V2 #${this.config.projectNumber} was not found for ${this.config.owner}/${this.config.repo}.`);
+      }
+
       this.projectId = result.repository.projectV2.id;
       console.log(`✓ Connected to project: ${result.repository.projectV2.title}`);
-    } catch (error: any) {
-      if (error.message?.includes('not been granted the required scopes')) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('not been granted the required scopes')) {
         throw new Error(
           'GitHub Token missing required scopes. Please add: read:project, write:project\n' +
           'See docs/GITHUB_TOKEN_SETUP.md for setup instructions.',
@@ -106,7 +164,7 @@ export class ProjectsV2Client {
       }
     `;
 
-    const result: any = await this.graphqlClient(mutation, {
+    const result = await this.graphqlClient<AddProjectItemResult>(mutation, {
       projectId: this.projectId,
       contentId: issueNodeId,
     });
@@ -154,7 +212,7 @@ export class ProjectsV2Client {
       }
     `;
 
-    const result: any = await this.graphqlClient(query, {
+    const result = await this.graphqlClient<ProjectFieldsResult>(query, {
       projectId: this.projectId,
     });
 
@@ -293,7 +351,7 @@ export class ProjectsV2Client {
       }
     `;
 
-    const result: any = await this.graphqlClient(query, {
+    const result = await this.graphqlClient<ProjectItemsResult>(query, {
       projectId: this.projectId,
     });
 
@@ -331,9 +389,9 @@ export class ProjectsV2Client {
         continue;
       }
 
-      for (const fieldValue of item.fieldValues.nodes) {
+      for (const fieldValue of item.fieldValues.nodes as ProjectFieldValueNode[]) {
         const fieldName = fieldValue.field.name;
-        const value = (fieldValue as any).text ?? (fieldValue as any).number ?? (fieldValue as any).name;
+        const value = fieldValue.text ?? fieldValue.number ?? fieldValue.name;
 
         if (fieldName === 'Duration' && typeof value === 'number') {
           totalDuration += value;
@@ -383,14 +441,19 @@ export class ProjectsV2Client {
       }
     `;
 
-    const result: any = await this.graphqlClient(query, {
+    const result = await this.graphqlClient<ContentNodeResult>(query, {
       owner: this.config.owner,
       repo: this.config.repo,
       [variableKey]: number,
       contentNumber: number,
     });
 
-    return result.repository[contentKey].id;
+    const contentNode = contentKey === 'issue' ? result.repository.issue : result.repository.pullRequest;
+    if (!contentNode?.id) {
+      throw new Error(`Could not find ${contentType} #${number} in ${this.config.owner}/${this.config.repo}.`);
+    }
+
+    return contentNode.id;
   }
 
   private findStatusOption(field: CustomField, requestedStatus: string) {

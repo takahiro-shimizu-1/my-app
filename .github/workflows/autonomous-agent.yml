@@ -2,7 +2,7 @@ name: Autonomous Agent Execution
 
 on:
   issues:
-    types: [opened, labeled, edited]
+    types: [labeled]
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -63,9 +63,12 @@ jobs:
   # Job 2: Execute Autonomous Agents
   execute-agents:
     name: Execute Autonomous Agents
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, my-app-local]
     needs: check-trigger
     if: needs.check-trigger.outputs.should_execute == 'true'
+    concurrency:
+      group: autonomous-agent-${{ needs.check-trigger.outputs.issue_number }}
+      cancel-in-progress: false
 
     permissions:
       contents: write
@@ -77,6 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          clean: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -90,115 +94,25 @@ jobs:
       - name: Run TypeScript compilation check
         run: npm run typecheck
 
-      - name: Check autonomous execution prerequisites
+      - name: Check local Claude Code authentication
         id: preflight
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
+          if claude auth status | node -e "let raw='';process.stdin.on('data',d=>raw+=d);process.stdin.on('end',()=>{const parsed=JSON.parse(raw);process.exit(parsed.loggedIn ? 0 : 1);});"; then
             echo "can_execute=true" >> "$GITHUB_OUTPUT"
           else
             echo "can_execute=false" >> "$GITHUB_OUTPUT"
-            echo "reason=ANTHROPIC_API_KEY is not configured" >> "$GITHUB_OUTPUT"
+            echo "reason=Claude Code is not logged in on the self-hosted runner" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create agent configuration
-        if: steps.preflight.outputs.can_execute == 'true'
-        run: |
-          cat > .env << EOF
-          GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-          DEVICE_IDENTIFIER="GitHub Actions Runner"
-          ISSUE_NUMBER=${{ needs.check-trigger.outputs.issue_number }}
-          REPOSITORY=${{ github.repository }}
-          EOF
-
-      - name: Execute CoordinatorAgent
+      - name: Execute local Claude Code pipeline
         id: execute
         if: steps.preflight.outputs.can_execute == 'true'
         run: |
-          echo "🚀 Starting Autonomous Agent execution for Issue #${{ needs.check-trigger.outputs.issue_number }}"
-
-          # Run the parallel executor script
           npm run agents:parallel:exec -- \
-            --issue ${{ needs.check-trigger.outputs.issue_number }} \
-            --concurrency 3 \
-            --log-level info
+            --issue ${{ needs.check-trigger.outputs.issue_number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        continue-on-error: true
-
-      - name: Check for generated code changes
-        id: check_changes
-        if: steps.preflight.outputs.can_execute == 'true'
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Code changes detected"
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No code changes"
-          fi
-
-      - name: Commit generated code
-        id: commit_changes
-        if: steps.preflight.outputs.can_execute == 'true' && steps.check_changes.outputs.has_changes == 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-          BRANCH_NAME="agent/issue-${{ needs.check-trigger.outputs.issue_number }}-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-
-          git add .
-          git commit -m "$(cat <<'EOF'
-          feat: autonomous agent implementation for issue #${{ needs.check-trigger.outputs.issue_number }}
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>
-          EOF
-          )"
-
-          git push origin "$BRANCH_NAME"
-
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create Pull Request
-        id: create_pr
-        if: steps.preflight.outputs.can_execute == 'true' && steps.check_changes.outputs.has_changes == 'true'
-        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_URL="$(gh pr create \
-            --base main \
-            --head "${{ steps.commit_changes.outputs.branch_name }}" \
-            --title "feat: autonomous agent implementation for issue #${{ needs.check-trigger.outputs.issue_number }}" \
-            --draft \
-            --body "$(cat <<'EOF'
-          ## Autonomous Agent Execution Report
-
-          **Issue**: #${{ needs.check-trigger.outputs.issue_number }}
-          **Triggered by**: ${{ github.actor }}
-          **Run ID**: ${{ github.run_id }}
-
-          ### Summary
-
-          This PR was generated by the autonomous execution workflow after a Miyabi full-cycle run.
-
-          ### Checklist
-
-          - [x] Agent pipeline executed
-          - [x] Repository changes were committed
-          - [ ] Manual review required
-          - [ ] Ready to merge
-
-          Closes #${{ needs.check-trigger.outputs.issue_number }}
-          EOF
-          )")"
-
-          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
 
       - name: Upload execution logs
         if: steps.preflight.outputs.can_execute == 'true' && always()
@@ -206,8 +120,7 @@ jobs:
         with:
           name: agent-execution-logs-${{ needs.check-trigger.outputs.issue_number }}
           path: |
-            .ai/logs/
-            .ai/parallel-reports/
+            .ai/local-runs/
           retention-days: 30
           if-no-files-found: ignore
 
@@ -225,44 +138,7 @@ jobs:
 
             ${{ steps.preflight.outputs.reason }}
 
-            Add \`ANTHROPIC_API_KEY\` as a repository secret to enable GitHub-side autonomous execution.`
-            })
-
-      - name: Comment on Issue (Success)
-        if: success() && steps.preflight.outputs.can_execute == 'true' && steps.check_changes.outputs.has_changes == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: ${{ needs.check-trigger.outputs.issue_number }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## ✅ Autonomous Agent Execution Complete
-
-            **Status**: Success
-            **Branch**: \`${{ steps.commit_changes.outputs.branch_name }}\`
-            **Pull Request**: ${{ steps.create_pr.outputs.pr_url }}
-
-            ### Actions Taken
-
-            - ✅ Issue analyzed by IssueAgent
-            - ✅ Code generated by CodeGenAgent
-            - ✅ Quality checked by ReviewAgent
-            - ✅ Pull Request created (draft)
-
-            ### Next Steps
-
-            1. Review the generated code in the PR
-            2. Check test results
-            3. Approve or request changes
-            4. Merge when ready
-
-            [View Pull Request →](${{ steps.create_pr.outputs.pr_url }})
-
-            ---
-
-            🤖 Executed by Autonomous Operations Agent System`
+            Log into Claude Code on the self-hosted runner before retrying.`
             })
 
       - name: Comment on Issue (Failure)
