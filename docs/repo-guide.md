@@ -121,6 +121,12 @@ Example:
 /home/shimizu/study/AI/hayashi/package/app-b
 ```
 
+## Autonomous Local Runner
+
+The autonomous issue runner (`.github/workflows/autonomous-agent.yml`) executes on a self-hosted PC runner labeled `my-app-local`. The runner uses a local Claude Code login so no additional API-key configuration is needed on the runner itself.
+
+To register the runner, add the labels `self-hosted`, `linux`, `x64`, and `my-app-local` when configuring the GitHub Actions runner on your PC.
+
 ## Current Stack
 
 This repository currently uses:
