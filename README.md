@@ -90,4 +90,4 @@ For the full GitHub OS automation in this repository:
 - `GITHUB_TOKEN` is used automatically in GitHub Actions.
 - `GH_PROJECT_TOKEN` is optional but required for Projects V2 sync/update.
 - `ANTHROPIC_API_KEY` is required for GitHub-side autonomous code generation.
-- `GITHUB_PROJECT_NUMBER` defaults to `1` if you do not set a repo variable.
+- `PROJECT_NUMBER` defaults to `1` if you do not set a repo variable.

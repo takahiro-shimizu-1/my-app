@@ -185,7 +185,7 @@ GH_PROJECT_TOKEN=ghp_xxxxx
 ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 # Projects V2 number（任意、未設定時は 1）
-GITHUB_PROJECT_NUMBER=1
+PROJECT_NUMBER=1
 ```
 
 ## サポート

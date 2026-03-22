@@ -11,7 +11,7 @@ async function main() {
   }
 
   const context = resolveRepositoryContext();
-  const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER || '1', 10);
+  const projectNumber = parseInt(process.env.PROJECT_NUMBER || process.env.GITHUB_PROJECT_NUMBER || '1', 10);
   const eventName = process.env.GITHUB_EVENT_NAME || '';
   const contentType = process.env.CONTENT_TYPE || (eventName === 'pull_request' ? 'pull_request' : 'issue');
   const contentNumber = parseInt(

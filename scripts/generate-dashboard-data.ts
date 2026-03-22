@@ -52,7 +52,7 @@ async function main() {
   const token = resolveGitHubToken();
   const projectToken = resolveGitHubToken({ preferProjectToken: true });
   const { owner, repo } = resolveRepositoryContext();
-  const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER || '1', 10);
+  const projectNumber = parseInt(process.env.PROJECT_NUMBER || process.env.GITHUB_PROJECT_NUMBER || '1', 10);
 
   console.log('Generating dashboard data...');
   console.log(`  Owner: ${owner}`);
@@ -204,7 +204,7 @@ function formatDashboardWarning(error: unknown) {
   }
 
   if (message.includes('Could not resolve to a ProjectV2')) {
-    return 'GitHub Project V2 was not found. Check GITHUB_PROJECT_NUMBER for this repository.';
+    return 'GitHub Project V2 was not found. Check PROJECT_NUMBER for this repository.';
   }
 
   if (message.includes('Bad credentials')) {

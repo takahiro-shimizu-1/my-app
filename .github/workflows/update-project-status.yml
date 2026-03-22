@@ -27,7 +27,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
           GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
-          GITHUB_PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER || '1' }}
           EVENT_ACTION: ${{ github.event.action }}
           CONTENT_TYPE: ${{ github.event_name == 'pull_request' && 'pull_request' || 'issue' }}
           CONTENT_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}

@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Add issue to project
     env:
-      PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
+      PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER || '1' }}
     steps:
       - name: Check project automation prerequisites
         id: preflight

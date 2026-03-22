@@ -13,7 +13,7 @@ jobs:
       issues: read
       pull-requests: read
     env:
-      PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
+      PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER || '1' }}
 
     steps:
       - name: Check project automation prerequisites

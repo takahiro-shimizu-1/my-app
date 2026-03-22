@@ -40,7 +40,7 @@ async function maybeLoadProjectKpi(context: ReturnType<typeof resolveRepositoryC
     return undefined;
   }
 
-  const projectNumber = parseInt(process.env.GITHUB_PROJECT_NUMBER || '1', 10);
+  const projectNumber = parseInt(process.env.PROJECT_NUMBER || process.env.GITHUB_PROJECT_NUMBER || '1', 10);
   const client = new ProjectsV2Client(token, {
     owner: context.owner,
     repo: context.repo,

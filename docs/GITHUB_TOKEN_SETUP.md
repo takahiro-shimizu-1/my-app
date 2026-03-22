@@ -27,7 +27,7 @@ Configure it as a repository secret named `GH_PROJECT_TOKEN`.
 
 Optional:
 
-- set repository variable `GITHUB_PROJECT_NUMBER`
+- set repository variable `PROJECT_NUMBER`
 
 If `GH_PROJECT_TOKEN` is missing, project-related workflows skip gracefully.
 

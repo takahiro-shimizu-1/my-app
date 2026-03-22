@@ -37,7 +37,7 @@ jobs:
           GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
           GITHUB_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO: ${{ github.event.repository.name }}
-          GITHUB_PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER || '1' }}
         run: npm run report:weekly:issue
 
       - name: Log completion
