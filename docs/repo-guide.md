@@ -105,6 +105,22 @@ npm run miyabi:status -- --json
 npm run miyabi:cycle
 ```
 
+## Autonomous Local Runner
+
+The `autonomous-agent.yml` workflow executes issue-driven agents on a
+self-hosted PC runner labeled **`my-app-local`**.
+
+Requirements for the runner machine:
+
+- GitHub Actions self-hosted runner registered with the labels
+  `self-hosted`, `linux`, `x64`, and `my-app-local`.
+- Claude Code installed and authenticated via `claude auth login`
+  (no `ANTHROPIC_API_KEY` secret needed).
+- Node.js and Docker available in `$PATH`.
+
+Because the runner uses a local Claude Code login, agent jobs work without
+storing an Anthropic API key in GitHub secrets.
+
 ## Creating a New App Repository
 
 When a new app is needed:
