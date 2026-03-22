@@ -31,7 +31,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Route Issue Event
         if: github.event_name == 'issues'
@@ -52,6 +52,7 @@ jobs:
           EVENT_TYPE: ${{ github.event.action }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
         run: |
           echo "📥 PR Event: $EVENT_TYPE for #$PR_NUMBER"
           npx tsx scripts/webhook-router.ts pr "$EVENT_TYPE" "$PR_NUMBER"

@@ -9,17 +9,37 @@ jobs:
   add-to-project:
     runs-on: ubuntu-latest
     name: Add issue to project
+    env:
+      PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
     steps:
+      - name: Check project automation prerequisites
+        id: preflight
+        env:
+          PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+        run: |
+          if [ -n "$PROJECT_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Add Issue to Project
+        if: steps.preflight.outputs.enabled == 'true'
         uses: actions/add-to-project@v0.5.0
         with:
-          project-url: https://github.com/users/${{ github.repository_owner }}/projects/1
+          project-url: https://github.com/users/${{ github.repository_owner }}/projects/${{ env.PROJECT_NUMBER }}
           github-token: ${{ secrets.GH_PROJECT_TOKEN }}
 
       - name: Set Initial Status
+        if: steps.preflight.outputs.enabled == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_PROJECT_TOKEN }}
           script: |
             // This will be implemented when custom field automation is added
             console.log('Issue #${{ github.event.issue.number }} added to project');
+
+      - name: Skip Summary
+        if: steps.preflight.outputs.enabled != 'true'
+        run: |
+          echo "GH_PROJECT_TOKEN is not configured, so project auto-add was skipped." >> $GITHUB_STEP_SUMMARY

@@ -52,9 +52,9 @@ jobs:
           # Check if Issue has agent-related labels
           LABELS="${{ toJson(github.event.issue.labels.*.name) }}"
 
-          if echo "$LABELS" | grep -q "🤖agent"; then
+          if echo "$LABELS" | grep -Eq "🤖 agent:|🤖agent"; then
             echo "✅ Agent label detected, will auto-process"
-            # TODO: Trigger IssueAgent workflow when implemented
+            echo "Dedicated agent workflows will handle this event."
           else
             echo "ℹ️ Regular issue, manual triage required"
           fi
@@ -63,17 +63,13 @@ jobs:
         if: |
           github.event_name == 'issues' &&
           github.event.action == 'labeled' &&
-          github.event.label.name == '🤖agent-execute'
+          (github.event.label.name == '🤖agent-execute' || github.event.label.name == '🤖 agent:coordinator')
         run: |
           echo "🚀 AGENT EXECUTION TRIGGERED"
           echo "Issue: #${{ github.event.issue.number }}"
           echo "Title: ${{ github.event.issue.title }}"
 
-          # Trigger CoordinatorAgent workflow
-          gh workflow run agent-runner.yml \
-            -f issue_number=${{ github.event.issue.number }} \
-            -f mode=autonomous \
-            || echo "⚠️ agent-runner.yml not found yet (will be created in Issue #4)"
+          echo "autonomous-agent.yml will process this issue event directly."
 
       - name: Route to Agent - PR Opened
         if: github.event_name == 'pull_request' && github.event.action == 'opened'
@@ -157,12 +153,12 @@ jobs:
           echo "Run ID: ${{ github.event.workflow_run.id }}"
 
           # Escalate to Guardian for critical failures
-          if echo "${{ github.event.workflow_run.name }}" | grep -qE "(agent-runner|economic-circuit-breaker)"; then
+          if echo "${{ github.event.workflow_run.name }}" | grep -qE "(Autonomous Agent Execution|🔴 Economic Circuit Breaker)"; then
             echo "🚨 Critical workflow failed, escalating to Guardian"
 
             gh issue create \
               --title "🚨 Critical Workflow Failure: ${{ github.event.workflow_run.name }}" \
-              --label "🔥Sev.1-Critical,🤖AI-システム" \
+              --label "🔥 severity:Sev.1-Critical,🤖 system:automation" \
               --assignee "${{ github.repository_owner }}" \
               --body "## 🚨 Critical Workflow Failure
 

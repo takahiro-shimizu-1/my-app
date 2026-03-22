@@ -34,9 +34,10 @@ jobs:
       - name: Generate weekly report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
           GITHUB_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO: ${{ github.event.repository.name }}
-          PROJECT_NUMBER: 1
+          GITHUB_PROJECT_NUMBER: ${{ vars.GITHUB_PROJECT_NUMBER || '1' }}
         run: npm run report:weekly:issue
 
       - name: Log completion

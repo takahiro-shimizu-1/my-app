@@ -20,6 +20,8 @@ my-app/
 
 This repository is for one application only. If you start another product, create another repository next to this one and apply the same tooling there.
 
+The default setup is standalone: `miyabi` and `agent-skill-bus` are installed from npm, so GitHub Actions can run from this repository by itself.
+
 ## Development
 
 ### Docker-first workflow
@@ -45,9 +47,11 @@ From there you can run repo-level commands such as:
 npm run miyabi:status
 npm run miyabi:doctor
 npm run asb:dashboard
+npm run gni:init
+npm run gni:doctor
 ```
 
-The Docker setup mounts the parent `package/` directory so the local `Miyabi/`, `agent-skill-bus/`, and `gitnexus-stable-ops/` sibling repositories are available inside the container too.
+The Docker setup still mounts the parent `package/` directory so local sibling repositories such as `gitnexus-stable-ops/` are available when you want to develop the tooling itself.
 
 ### Host workflow
 
@@ -77,4 +81,13 @@ Repo-level automation stays at the repository root:
 
 - `Miyabi` manages GitHub workflows, labels, and agent orchestration for this repository.
 - `agent-skill-bus` tracks skill health and queue state in `.skill-bus/`.
-- `gitnexus-stable-ops` remains optional until the host or container can run a compatible `gitnexus-stable` binary.
+- `gitnexus-stable-ops` can be bootstrapped locally with `npm run gni:init` once a compatible `gitnexus-stable` binary is present.
+
+## GitHub Automation Prerequisites
+
+For the full GitHub OS automation in this repository:
+
+- `GITHUB_TOKEN` is used automatically in GitHub Actions.
+- `GH_PROJECT_TOKEN` is optional but required for Projects V2 sync/update.
+- `ANTHROPIC_API_KEY` is required for GitHub-side autonomous code generation.
+- `GITHUB_PROJECT_NUMBER` defaults to `1` if you do not set a repo variable.

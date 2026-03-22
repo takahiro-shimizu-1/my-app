@@ -178,8 +178,14 @@ Claude Code で以下のコマンドが使用可能:
 # GitHub Personal Access Token（必須）
 GITHUB_TOKEN=ghp_xxxxx
 
-# Anthropic API Key（必須 - Agent実行時）
+# GitHub Projects V2 token（任意 - Projects同期時）
+GH_PROJECT_TOKEN=ghp_xxxxx
+
+# Anthropic API Key（GitHub Actions からの Agent実行時に必須）
 ANTHROPIC_API_KEY=sk-ant-xxxxx
+
+# Projects V2 number（任意、未設定時は 1）
+GITHUB_PROJECT_NUMBER=1
 ```
 
 ## サポート

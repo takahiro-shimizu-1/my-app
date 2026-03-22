@@ -61,7 +61,7 @@ jobs:
             const body = (context.payload.issue.body || '').toLowerCase();
 
             if (title.includes('critical') || body.includes('production down') || body.includes('security')) {
-              priority = '🔥 priority:P0-Critical';
+              priority = '📊 priority:P0-Critical';
             } else if (title.includes('urgent') || title.includes('bug') || body.includes('broken')) {
               priority = '⚠️ priority:P1-High';
             } else if (title.includes('enhancement') || title.includes('feature')) {

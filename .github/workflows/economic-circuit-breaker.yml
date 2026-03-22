@@ -258,7 +258,7 @@ jobs:
           # Guardianへの通知Issue作成
           gh issue create \
             --title "🔴🚨 ECONOMIC CIRCUIT BREAKER ACTIVATED - Guardian Intervention Required" \
-            --label "🔥Sev.1-Critical,🤖AI-システム,💰経済-緊急停止" \
+            --label "🔥 severity:Sev.1-Critical,🤖 system:automation,💰 economic:emergency" \
             --assignee "${{ github.repository_owner }}" \
             --body "$(cat <<'EOF'
           ## 🚨 ECONOMIC CIRCUIT BREAKER ACTIVATED
@@ -341,7 +341,7 @@ jobs:
         run: |
           # 既存の警告Issueを検索
           EXISTING_ISSUE=$(gh issue list \
-            --label "💰経済-警告" \
+            --label "💰 economic:warning" \
             --state open \
             --json number \
             --jq '.[0].number')
@@ -350,7 +350,7 @@ jobs:
             # 警告Issueが存在しない場合は作成
             gh issue create \
               --title "⚠️ Economic Warning - Approaching Budget Limit (${{ steps.calculate.outputs.consumption_percent }}%)" \
-              --label "⚠️重要度-高,🤖AI-システム,💰経済-警告" \
+              --label "⚠️ severity:Sev.2-High,🤖 system:automation,💰 economic:warning" \
               --body "$(cat <<'EOF'
           ## ⚠️ Economic Warning
 
