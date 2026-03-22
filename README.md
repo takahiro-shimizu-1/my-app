@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# my-app
 
-## Getting Started
+Docker-first monorepo for building multiple apps under one Miyabi-managed repository.
 
-First, run the development server:
+## Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+my-app/
+├── apps/
+│   └── web/               # Current Next.js + TypeScript + App Router app
+├── packages/              # Shared libraries for future apps
+├── docker/                # Development image definition
+├── scripts/               # Repo-level helpers
+├── .claude/               # Miyabi / Claude operational config
+├── .github/workflows/     # GitHub automation
+├── CLAUDE.md              # Repo context for agents
+└── package.json           # Monorepo entrypoint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Each app lives in its own workspace under `apps/`, so the stack can vary per app. Right now `apps/web` is a Next.js app, but future apps can be other Next.js apps or different runtimes as long as they expose `dev`, `build`, `start`, and `lint` scripts.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Docker-first workflow
 
-## Learn More
+The repository is designed to run without installing project dependencies on your PC.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+docker compose build
+docker compose up web
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This starts the default app at `http://localhost:3000`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open a shell inside the same toolchain:
 
-## Deploy on Vercel
+```bash
+docker compose run --rm workspace bash
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+From there you can run repo-level commands such as:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run miyabi:status
+npm run miyabi:doctor
+npm run asb:dashboard
+```
+
+The Docker setup mounts the parent `package/` directory so the local `Miyabi/` and `agent-skill-bus/` sibling repositories are available inside the container too.
+
+### Host workflow
+
+If you want to run from the host anyway, root scripts proxy to the default app:
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run lint
+```
+
+## Running Other Apps Later
+
+The root scripts are app-aware:
+
+```bash
+APP_NAME=web npm run app:dev
+APP_NAME=web npm run app:build
+APP_NAME=web npm run app:lint
+```
+
+When you add a new workspace such as `apps/admin`, the same commands work as long as that app has matching npm scripts.
+
+## Adding a New App
+
+1. Create a new workspace under `apps/<name>`.
+2. Give it a package name like `@my-app/<name>`.
+3. Add `dev`, `build`, `start`, and `lint` scripts in that app's `package.json`.
+4. Run it with `APP_NAME=<name> npm run app:dev` or add a dedicated Docker service if it needs different ports or services.
+
+## Miyabi and Tooling
+
+Repo-level automation stays at the repository root:
+
+- `Miyabi` manages GitHub workflows, labels, and agent orchestration.
+- `agent-skill-bus` tracks skill health and queue state in `.skill-bus/`.
+- `gitnexus-stable-ops` remains optional until the host or container can run a compatible `gitnexus-stable` binary.

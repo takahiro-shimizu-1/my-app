@@ -2,9 +2,9 @@
 
 ## プロジェクト概要
 
-**my-app** - Miyabiフレームワークで構築された自律型開発プロジェクト
+**my-app** - Miyabiフレームワークで構築された Docker-first モノレポ
 
-このプロジェクトは識学理論(Shikigaku Theory)とAI Agentsを組み合わせた自律型開発環境で運用されています。
+このプロジェクトは識学理論(Shikigaku Theory)とAI Agentsを組み合わせた自律型開発環境で運用されています。アプリ本体は `apps/` 配下の workspace として管理し、repo root は運用・自動化・共通設定を担います。
 
 ## 🌸 Miyabi Framework
 
@@ -101,6 +101,8 @@ npm run test:coverage       # カバレッジレポート
 
 ## 使用方法
 
+通常の開発は Docker を優先し、依存関係はコンテナ内で解決します。
+
 ### Issue作成（Claude Code推奨）
 
 ```bash
@@ -121,6 +123,11 @@ npx miyabi status          # 現在の状態
 npx miyabi status --watch  # リアルタイム監視
 ```
 
+```bash
+docker compose up web      # デフォルトアプリを起動
+docker compose run --rm workspace bash
+```
+
 ### Agent実行
 
 ```bash
@@ -131,14 +138,17 @@ npx miyabi status --watch  # リアルタイム監視
 
 ```
 my-app/
+├── apps/
+│   └── web/              # 現在の Next.js App Router アプリ
+├── packages/             # 将来の共通ライブラリ
 ├── .claude/               # Claude Code設定
 │   ├── agents/           # Agent定義
 │   ├── commands/         # カスタムコマンド
 │   └── settings.json     # Claude設定
 ├── .github/
-│   └── workflows/        # 26+ GitHub Actions
-├── src/                  # ソースコード
-├── tests/                # テストコード
+│   └── workflows/        # GitHub Actions
+├── docker/               # Docker開発環境
+├── scripts/              # モノレポ運用スクリプト
 ├── CLAUDE.md             # このファイル
 └── package.json
 ```

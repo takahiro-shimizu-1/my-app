@@ -1,0 +1,46 @@
+name: my-app
+
+x-workspace-base: &workspace-base
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.workspace
+  entrypoint:
+    - ./scripts/docker-bootstrap.sh
+  working_dir: /workspace/my-app
+  environment:
+    APP_NAME: ${APP_NAME:-web}
+    APP_PORT: ${APP_PORT:-3000}
+    GH_TOKEN: ${GH_TOKEN:-}
+    GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    NEXT_TELEMETRY_DISABLED: "1"
+    CHOKIDAR_USEPOLLING: "true"
+    WATCHPACK_POLLING: "true"
+  stdin_open: true
+  tty: true
+  volumes:
+    - ..:/workspace
+    - my-app-node-modules:/workspace/my-app/node_modules
+    - web-next-cache:/workspace/my-app/apps/web/.next
+    - npm-cache:/root/.npm
+    - ${HOME}/.config/gh:/root/.config/gh:ro
+
+services:
+  workspace:
+    <<: *workspace-base
+    command:
+      - sleep
+      - infinity
+
+  web:
+    <<: *workspace-base
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    command:
+      - bash
+      - -lc
+      - npm run dev -- --hostname 0.0.0.0 --port ${APP_PORT:-3000}
+
+volumes:
+  my-app-node-modules:
+  web-next-cache:
+  npm-cache:
