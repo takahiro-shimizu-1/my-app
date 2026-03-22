@@ -6,7 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "miyabi": "./scripts/miyabi-local.sh",
+    "miyabi:doctor": "./scripts/miyabi-local.sh doctor",
+    "miyabi:status": "./scripts/miyabi-local.sh status",
+    "miyabi:cycle": "./scripts/miyabi-local.sh cycle status",
+    "miyabi:bus:init": "./scripts/miyabi-local.sh bus init",
+    "miyabi:bus:health": "./scripts/miyabi-local.sh bus health --update",
+    "miyabi:bus:record-bootstrap": "./scripts/miyabi-local.sh bus record-run project-setup --task \"bootstrap my-app\" --result success --score 1",
+    "asb:dashboard": "agent-skill-bus dashboard --data-dir .skill-bus --queue-dir queue --skills-dir monitor --kw-dir watcher",
+    "gni:doctor": "../gitnexus-stable-ops/bin/gitnexus-doctor.sh . my-app Page",
+    "gni:reindex": "REPO_PATH=. ../gitnexus-stable-ops/bin/gitnexus-auto-reindex.sh"
   },
   "dependencies": {
     "next": "16.2.1",
@@ -18,8 +28,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "agent-skill-bus": "file:../agent-skill-bus",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "miyabi": "file:../Miyabi/packages/cli",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

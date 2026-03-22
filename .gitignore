@@ -17,6 +17,20 @@
 /.next/
 /out/
 
+# tool runtime state
+/.skill-bus/
+/.agent-skill-bus/
+/.gitnexus/
+/skills/**/prompt-request-queue.jsonl
+/skills/**/active-locks.jsonl
+/skills/**/dag-state.jsonl
+/skills/**/prompt-request-history.md
+/skills/**/skill-runs.jsonl
+/skills/**/skill-health.json
+/skills/**/skill-improvements.md
+/skills/**/knowledge-state.json
+/skills/**/knowledge-diffs.jsonl
+
 # production
 /build
 

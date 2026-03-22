@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Miyabi-generated operational assets use CommonJS and are not app code.
+    ".claude/**",
   ]),
 ]);
 
