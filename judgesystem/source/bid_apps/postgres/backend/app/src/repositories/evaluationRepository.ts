@@ -1,5 +1,4 @@
 import { pool, TABLES, schemaPrefix } from "../config/database";
-import { readMultipleMarkdownFromGCS } from "../utils/gcs";
 import { FilterParams } from "../types";
 
 type QualifiedTables = {
@@ -27,17 +26,9 @@ export class EvaluationRepository {
     try {
       const tables = this.getQualifiedTables();
       const baseFromClause = this.getBaseFromClause(tables);
-      const statusExpression = this.getStatusExpression();
-      const workStatusExpression = this.getWorkStatusExpression();
-      const currentStepExpression = this.getCurrentStepExpression();
-      const priorityExpression = this.getPriorityExpression();
 
-      // Build WHERE clause
-      const { whereClause, queryParams, paramIndex } = this.buildWhereClause(
-        filters,
-        statusExpression,
-        workStatusExpression
-      );
+      // Build WHERE clause (no status/workStatus filtering - Service handles that)
+      const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
 
       // Get total count
       const countQuery = `SELECT COUNT(*) as count ${baseFromClause} ${whereClause}`;
@@ -45,13 +36,7 @@ export class EvaluationRepository {
       const total = parseInt(countResult.rows[0].count);
 
       // Build ORDER BY clause
-      const orderByClause = this.buildOrderByClause(
-        filters.sortField,
-        filters.sortOrder,
-        statusExpression,
-        workStatusExpression,
-        priorityExpression
-      );
+      const orderByClause = this.buildOrderByClause(filters.sortField, filters.sortOrder);
 
       // Get paginated data
       const page = filters.page || 0;
@@ -73,8 +58,7 @@ export class EvaluationRepository {
             'estimatedAmountMax', aea.estimated_amount_max
           ) AS announcement,
           jsonb_build_object(
-            'name', COALESCE(cm.company_name, ''),
-            'priority', ${priorityExpression}
+            'name', COALESCE(cm.company_name, '')
           ) AS company,
           jsonb_build_object(
             'id', CONCAT('brn-', cbj.office_no),
@@ -85,9 +69,15 @@ export class EvaluationRepository {
             'fax', COALESCE(om.office_fax, ''),
             'postalCode', COALESCE(om.office_postal_code, '')
           ) AS branch,
-          ${statusExpression} AS status,
-          ${workStatusExpression} AS "workStatus",
-          ${currentStepExpression} AS "currentStep",
+          cbj.final_status AS "finalStatus",
+          cbj.requirement_ineligibility AS "requirementIneligibility",
+          cbj.requirement_grade_item AS "requirementGradeItem",
+          cbj.requirement_location AS "requirementLocation",
+          cbj.requirement_experience AS "requirementExperience",
+          cbj.requirement_technician AS "requirementTechnician",
+          cbj.requirement_other AS "requirementOther",
+          evs."workStatus" AS "workStatus",
+          evs."currentStep" AS "currentStep",
           cbj."updatedDate" AS "evaluatedAt"
         ${baseFromClause}
         ${whereClause}
@@ -113,10 +103,6 @@ export class EvaluationRepository {
     const client = await pool.connect();
     try {
       const tables = this.getQualifiedTables();
-      const statusExpression = this.getStatusExpression();
-      const workStatusExpression = this.getWorkStatusExpression();
-      const currentStepExpression = this.getCurrentStepExpression();
-      const priorityExpression = this.getPriorityExpression();
       const baseFromClause = this.getBaseFromClause(tables);
 
       const result = await client.query(
@@ -268,8 +254,7 @@ export class EvaluationRepository {
             'id', CONCAT('com-', cbj.company_no),
             'name', COALESCE(cm.company_name, ''),
             'address', COALESCE(cm.company_address, ''),
-            'grade', 'A',
-            'priority', ${priorityExpression}
+            'grade', 'A'
           ) AS company,
           jsonb_build_object(
             'id', CONCAT('brn-', cbj.office_no),
@@ -282,9 +267,15 @@ export class EvaluationRepository {
           ) AS branch,
           COALESCE(sa.assignees, '[]'::jsonb) AS "stepAssignees",
           COALESCE(req.requirements, '[]'::jsonb) AS requirements,
-          ${statusExpression} AS status,
-          ${workStatusExpression} AS "workStatus",
-          ${currentStepExpression} AS "currentStep",
+          cbj.final_status AS "finalStatus",
+          cbj.requirement_ineligibility AS "requirementIneligibility",
+          cbj.requirement_grade_item AS "requirementGradeItem",
+          cbj.requirement_location AS "requirementLocation",
+          cbj.requirement_experience AS "requirementExperience",
+          cbj.requirement_technician AS "requirementTechnician",
+          cbj.requirement_other AS "requirementOther",
+          evs."workStatus" AS "workStatus",
+          evs."currentStep" AS "currentStep",
           cbj."updatedDate" AS "evaluatedAt"
         ${baseFromClause}
         LEFT JOIN documents doc ON doc.announcement_id::text = cbj.announcement_no::text
@@ -302,18 +293,7 @@ export class EvaluationRepository {
         return null;
       }
 
-      const evaluation = result.rows[0];
-
-      if (
-        evaluation?.announcement?.documents &&
-        Array.isArray(evaluation.announcement.documents)
-      ) {
-        evaluation.announcement.documents = await this.attachDocumentContents(
-          evaluation.announcement.documents
-        );
-      }
-
-      return evaluation;
+      return result.rows[0];
     } finally {
       client.release();
     }
@@ -349,112 +329,72 @@ export class EvaluationRepository {
   }
 
   /**
-   * Get statistics for analytics dashboard
+   * Get raw data for analytics dashboard (Service computes statuses)
    */
   async getStats(): Promise<any> {
     const client = await pool.connect();
     try {
       const tables = this.getQualifiedTables();
       const baseFromClause = this.getBaseFromClause(tables);
-      const statusExpression = this.getStatusExpression();
 
       const result = await client.query(`
-        WITH base AS (
-          SELECT
-            ${statusExpression} AS status,
-            COALESCE(ba."topAgencyName", '') AS organization,
-            COALESCE(ba.category, '') AS category
-          ${baseFromClause}
-        )
         SELECT
-          COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE status = 'all_met') AS "allMet",
-          COUNT(*) FILTER (WHERE status = 'other_only_unmet') AS "otherUnmet",
-          COUNT(*) FILTER (WHERE status = 'unmet') AS "unmet",
-          (
-            SELECT jsonb_agg(org_stats ORDER BY count DESC)
-            FROM (
-              SELECT
-                SPLIT_PART(organization, ' ', 1) AS organization,
-                COUNT(*) AS count
-              FROM base
-              GROUP BY SPLIT_PART(organization, ' ', 1)
-              ORDER BY COUNT(*) DESC
-              LIMIT 5
-            ) org_stats
-          ) AS "topOrganizations",
-          (
-            SELECT COUNT(DISTINCT SPLIT_PART(organization, ' ', 1))
-            FROM base
-          ) AS "organizationCount",
-          (
-            SELECT jsonb_agg(cat_stats ORDER BY count DESC)
-            FROM (
-              SELECT
-                category,
-                COUNT(*) AS count
-              FROM base
-              GROUP BY category
-              ORDER BY COUNT(*) DESC
-              LIMIT 5
-            ) cat_stats
-          ) AS "topCategories"
-        FROM base
+          cbj.final_status AS "finalStatus",
+          cbj.requirement_ineligibility AS "requirementIneligibility",
+          cbj.requirement_grade_item AS "requirementGradeItem",
+          cbj.requirement_location AS "requirementLocation",
+          cbj.requirement_experience AS "requirementExperience",
+          cbj.requirement_technician AS "requirementTechnician",
+          cbj.requirement_other AS "requirementOther",
+          COALESCE(ba."topAgencyName", '') AS organization,
+          COALESCE(ba.category, '') AS category
+        ${baseFromClause}
       `);
 
-      return result.rows[0];
+      return result.rows;
     } finally {
       client.release();
     }
   }
 
   /**
-   * Get counts for each evaluation status based on current filters
+   * Get raw boolean columns for status counting (Service computes statuses and counts)
    */
-  async getStatusCounts(filters: FilterParams): Promise<{ all_met: number; other_only_unmet: number; unmet: number }> {
+  async getStatusCountsRaw(filters: FilterParams): Promise<any[]> {
     const client = await pool.connect();
     try {
       const tables = this.getQualifiedTables();
       const baseFromClause = this.getBaseFromClause(tables);
-      const statusExpression = this.getStatusExpression();
-      const workStatusExpression = this.getWorkStatusExpression();
 
-      const { whereClause, queryParams } = this.buildWhereClause(filters, statusExpression, workStatusExpression);
+      const { whereClause, queryParams } = this.buildWhereClause(filters);
 
       const result = await client.query(
         `
-        WITH base AS (
-          SELECT
-            ${statusExpression} AS status
-          ${baseFromClause}
-          ${whereClause}
-        )
         SELECT
-          COUNT(*) FILTER (WHERE status = 'all_met') AS "all_met",
-          COUNT(*) FILTER (WHERE status = 'other_only_unmet') AS "other_only_unmet",
-          COUNT(*) FILTER (WHERE status = 'unmet') AS "unmet"
-        FROM base
+          cbj.final_status AS "finalStatus",
+          cbj.requirement_ineligibility AS "requirementIneligibility",
+          cbj.requirement_grade_item AS "requirementGradeItem",
+          cbj.requirement_location AS "requirementLocation",
+          cbj.requirement_experience AS "requirementExperience",
+          cbj.requirement_technician AS "requirementTechnician",
+          cbj.requirement_other AS "requirementOther"
+        ${baseFromClause}
+        ${whereClause}
         `,
         queryParams
       );
 
-      if (result.rowCount === 0) {
-        return { all_met: 0, other_only_unmet: 0, unmet: 0 };
-      }
-
-      return result.rows[0];
+      return result.rows;
     } finally {
       client.release();
     }
   }
 
   /**
-   * Build WHERE clause from filters
+   * Build WHERE clause from filters (pure data column filters only)
    */
   private buildWhereClause(
-    filters: FilterParams,
-    statusExpression: string,
-    workStatusExpression: string
+    filters: FilterParams
   ): {
     whereClause: string;
     queryParams: any[];
@@ -463,29 +403,6 @@ export class EvaluationRepository {
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
     let paramIndex = 1;
-
-    if (filters.statuses && filters.statuses.length > 0) {
-      whereClauses.push(`${statusExpression} = ANY($${paramIndex})`);
-      queryParams.push(filters.statuses);
-      paramIndex++;
-    }
-
-    if (filters.workStatuses && filters.workStatuses.length > 0) {
-      whereClauses.push(`${workStatusExpression} = ANY($${paramIndex})`);
-      queryParams.push(filters.workStatuses);
-      paramIndex++;
-    }
-
-    if (filters.priorities && filters.priorities.length > 0) {
-      const priorityInts = filters.priorities
-        .map((p: string) => parseInt(p, 10))
-        .filter((p: number) => !isNaN(p));
-      if (priorityInts.length > 0) {
-        whereClauses.push(`1 = ANY($${paramIndex}::int[])`);
-        queryParams.push(priorityInts);
-        paramIndex++;
-      }
-    }
 
     if (filters.categories && filters.categories.length > 0) {
       whereClauses.push(`ba.category = ANY($${paramIndex})`);
@@ -538,23 +455,14 @@ export class EvaluationRepository {
   }
 
   /**
-   * Build ORDER BY clause
+   * Build ORDER BY clause (only data column sorting)
    */
-  private buildOrderByClause(
-    sortField: string | undefined,
-    sortOrder: string | undefined,
-    statusExpression: string,
-    workStatusExpression: string,
-    priorityExpression: string
-  ): string {
+  private buildOrderByClause(sortField: string | undefined, sortOrder: string | undefined): string {
     if (!sortField) return '';
 
     const direction = sortOrder === 'desc' ? 'DESC' : 'ASC';
     const fieldMap: Record<string, string> = {
       evaluationNo: 'cbj.evaluation_no',
-      status: statusExpression,
-      workStatus: workStatusExpression,
-      priority: `${priorityExpression}`,
       title: `ba."workName"`,
       company: `cm.company_name`,
       organization: `ba."topAgencyName"`,
@@ -605,58 +513,5 @@ export class EvaluationRepository {
       LEFT JOIN ${tables.announcementsEstimatedAmounts} aea ON aea.announcement_no::text = cbj.announcement_no::text
       LEFT JOIN ${tables.evaluationStatuses} evs ON evs."evaluationNo" = cbj.evaluation_no::text
     `;
-  }
-
-  private getStatusExpression(): string {
-    return `
-      CASE
-        WHEN COALESCE(cbj.final_status, FALSE) THEN 'all_met'
-        WHEN
-          COALESCE(cbj.requirement_ineligibility, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_grade_item, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_location, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_experience, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_technician, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_other, FALSE) = FALSE
-        THEN 'other_only_unmet'
-        ELSE 'unmet'
-      END
-    `;
-  }
-
-  private getWorkStatusExpression(): string {
-    return `COALESCE(evs."workStatus", 'not_started')`;
-  }
-
-  private getCurrentStepExpression(): string {
-    return `COALESCE(evs."currentStep", 'judgment')`;
-  }
-
-  private getPriorityExpression(): string {
-    return `1`;
-  }
-
-  private async attachDocumentContents(documents: any[]): Promise<any[]> {
-    const fallback = "文字起こしデータがありません";
-
-    // GCS パスを収集し、有効なパスのインデックスを記録
-    const gcsPaths: string[] = [];
-    const gcsIndexMap: number[] = [];
-    documents.forEach((doc, i) => {
-      if (doc.markdown_path && typeof doc.markdown_path === "string" && doc.markdown_path.startsWith("gs://")) {
-        gcsPaths.push(doc.markdown_path);
-        gcsIndexMap.push(i);
-      }
-    });
-
-    // 全 GCS パスを並列で一括取得（個別失敗はフォールバック値）
-    const contents = await readMultipleMarkdownFromGCS(gcsPaths, fallback);
-
-    // 結果をドキュメントにマッピング
-    return documents.map((doc, i) => {
-      const gcsIdx = gcsIndexMap.indexOf(i);
-      const content = gcsIdx !== -1 ? contents[gcsIdx] : fallback;
-      return { ...doc, content, markdown_path: undefined };
-    });
   }
 }

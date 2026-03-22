@@ -1,0 +1,352 @@
+@startuml data-flow
+!theme plain
+title 入札案件審査システム - データフローシーケンス図\n3層アーキテクチャを通じた主要オペレーション
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Noto Sans CJK JP"
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #37474F
+  LifeLineBorderColor #546E7A
+  ParticipantBackgroundColor<<presentation>> #E3F2FD
+  ParticipantBackgroundColor<<business>> #FFF3E0
+  ParticipantBackgroundColor<<data>> #E8F5E9
+  ParticipantBackgroundColor<<external>> #F3E5F5
+  ParticipantBorderColor #546E7A
+  GroupBackgroundColor #FAFAFA
+  DividerBackgroundColor #ECEFF1
+}
+
+' ==================================================================
+' Participants
+' ==================================================================
+
+actor "利用者" as User
+
+box "Presentation層 (Controller + View)" #E3F2FD
+  participant "React SPA\n(App.tsx)" as FE <<presentation>>
+  participant "Express Router\n(index.ts)" as Router <<presentation>>
+end box
+
+box "Business Logic層 (Service)" #FFF3E0
+  participant "EvaluationService" as EvalSvc <<business>>
+  participant "AnnouncementService" as AnnSvc <<business>>
+  participant "DocumentService" as DocSvc <<business>>
+end box
+
+box "Data Access層 (Repository)" #E8F5E9
+  participant "EvaluationRepository" as EvalRepo <<data>>
+  participant "AnnouncementRepository" as AnnRepo <<data>>
+  participant "GCS Utility\n(utils/gcs.ts)" as GcsUtil <<data>>
+end box
+
+box "外部データストア" #F3E5F5
+  database "PostgreSQL\n(Cloud SQL)" as DB <<external>>
+  collections "Cloud Storage\n(GCS)" as GCS <<external>>
+end box
+
+' ==================================================================
+' 1. 評価一覧取得 (GET /api/evaluations)
+' ==================================================================
+== 1. 評価一覧取得 (GET /api/evaluations) ==
+
+User -> FE : BidListPage を表示
+activate FE
+FE -> Router : GET /api/evaluations\n?page=0&pageSize=25&searchQuery=...
+activate Router
+
+Router -> EvalSvc : **getList(filters)**
+activate EvalSvc
+note right of EvalSvc
+  **Service層のビジネスロジック:**
+  - page / pageSize のデフォルト値適用
+  - filters の正規化
+  (ステータス判定は SQL CASE で実行中)
+end note
+
+EvalSvc -> EvalRepo : **findWithFilters(filters)**
+activate EvalRepo
+note right of EvalRepo
+  **Repository層 (SQLはここだけ):**
+  - buildWhereClause() でフィルタ条件構築
+  - COUNT(*) で total 取得
+  - company_bid_judgement JOIN bid_announcements
+    JOIN company_master LEFT JOIN office_master
+    LEFT JOIN evaluation_statuses
+  - LIMIT / OFFSET でページネーション
+end note
+
+EvalRepo -> DB : SELECT ... FROM company_bid_judgement\nJOIN bid_announcements ...\nWHERE ... LIMIT $n OFFSET $m
+activate DB
+DB --> EvalRepo : rows[] + total count
+deactivate DB
+
+EvalRepo --> EvalSvc : { data: rows[], total }
+deactivate EvalRepo
+
+EvalSvc --> Router : { data, total, page, pageSize }
+deactivate EvalSvc
+
+Router --> FE : 200 JSON response
+deactivate Router
+
+FE --> User : 評価一覧テーブル描画
+deactivate FE
+
+' ==================================================================
+' 2. 評価詳細取得 with GCS enrichment (GET /api/evaluations/:id)
+' ==================================================================
+== 2. 評価詳細取得 + GCSドキュメント付与 (GET /api/evaluations/:id) ==
+
+User -> FE : BidDetailPage へ遷移
+activate FE
+FE -> Router : GET /api/evaluations/12345
+activate Router
+
+Router -> EvalSvc : **getById("12345")**
+activate EvalSvc
+
+EvalSvc -> EvalRepo : **findById("12345")**
+activate EvalRepo
+note right of EvalRepo
+  **Repository層 (SQLはここだけ):**
+  - WITH documents, competing_companies,
+    step_assignees, requirement_details
+  - 複数テーブルを CTE + LEFT JOIN で結合
+  - documents に markdown_path を含む
+end note
+
+EvalRepo -> DB : SELECT ... WITH documents AS (...)\nWHERE evaluation_no = $1
+activate DB
+DB --> EvalRepo : evaluation row\n(announcement.documents に markdown_path あり)
+deactivate DB
+
+EvalRepo --> EvalSvc : evaluation object
+deactivate EvalRepo
+
+note right of EvalSvc #FFFDE7
+  **Service層のビジネスロジック:**
+  evaluation.announcement.documents が存在する場合
+  DocumentService でGCSコンテンツを付与
+end note
+
+EvalSvc -> DocSvc : **attachDocumentContents(documents[])**
+activate DocSvc
+
+note right of DocSvc #FFFDE7
+  **DocumentService のビジネスロジック:**
+  1. documents[] から gs:// パスを抽出
+  2. gcsPaths[] と gcsIndexMap[] を構築
+  3. readMultipleMarkdownFromGCS() で並列取得
+  4. content を付与、markdown_path を除去
+  5. 失敗時: "文字起こしデータがありません"
+end note
+
+DocSvc -> GcsUtil : **readMultipleMarkdownFromGCS(gcsPaths[], fallback)**
+activate GcsUtil
+
+GcsUtil -> GCS : **Promise.all([\n  storage.bucket(b).file(f1).download(),\n  storage.bucket(b).file(f2).download(),\n  ...\n])**
+activate GCS
+note right of GCS
+  各ファイルを並列ダウンロード
+  (Excel/PDF の OCR 解析結果 Markdown)
+end note
+GCS --> GcsUtil : Buffer[] (UTF-8 markdown)
+deactivate GCS
+
+GcsUtil --> DocSvc : string[] (markdown contents)
+deactivate GcsUtil
+
+DocSvc --> EvalSvc : documents[] with content populated
+deactivate DocSvc
+
+EvalSvc --> Router : evaluation (documents に content 付き)
+deactivate EvalSvc
+
+Router --> FE : 200 JSON response
+deactivate Router
+
+FE --> User : 評価詳細画面 + ドキュメント内容表示
+deactivate FE
+
+' ==================================================================
+' 3. 公告ステータス判定 (GET /api/announcements)
+' ==================================================================
+== 3. 公告一覧 + ステータス判定 (GET /api/announcements) ==
+
+User -> FE : AnnouncementListPage を表示
+activate FE
+FE -> Router : GET /api/announcements\n?page=0&pageSize=25
+activate Router
+
+Router -> AnnSvc : **getList(filters)**
+activate AnnSvc
+note right of AnnSvc #FFFDE7
+  **Service層のビジネスロジック:**
+  - page / pageSize のデフォルト値適用
+  - (ステータス判定ロジック定義あり)
+  **determineAnnouncementStatus(bidEndDate):**
+    - 日付なし/無効 -> "closed"
+    - end >= now+14日 -> "upcoming" (公告中)
+    - end >= now     -> "ongoing" (締切間近)
+    - end < now      -> "awaiting_result" (結果待)
+  **normalizeBidType(bidType):**
+    - NULL/空 -> "unknown"
+end note
+
+AnnSvc -> AnnRepo : **findWithFilters(filters)**
+activate AnnRepo
+note right of AnnRepo
+  **Repository層 (SQLはここだけ):**
+  - buildWhereClause() でフィルタ条件構築
+  - COUNT(*) で total 取得
+  - bid_announcements テーブルから SELECT
+  - bidType は COALESCE(..., 'unknown')
+  - ページネーション (LIMIT / OFFSET)
+end note
+
+AnnRepo -> DB : SELECT announcement_no, "workName",\n"topAgencyName", "bidEndDate" ...\nFROM bid_announcements\nWHERE ... LIMIT $n OFFSET $m
+activate DB
+DB --> AnnRepo : rows[] + total count
+deactivate DB
+
+AnnRepo --> AnnSvc : { data: rows[], total }
+deactivate AnnRepo
+
+AnnSvc --> Router : { data, total, page, pageSize }
+deactivate AnnSvc
+
+Router --> FE : 200 JSON response
+deactivate Router
+
+FE --> User : 公告一覧テーブル描画
+deactivate FE
+
+' ==================================================================
+' 4. ワークステータス更新 (PATCH /api/evaluations/:evaluationNo)
+' ==================================================================
+== 4. ワークステータス更新 (PATCH /api/evaluations/:evaluationNo) ==
+
+User -> FE : ステータスを変更\n(例: "in_progress" -> "completed")
+activate FE
+FE -> Router : PATCH /api/evaluations/12345\n{ "workStatus": "completed",\n  "currentStep": "final_review" }
+activate Router
+
+Router -> EvalSvc : **updateWorkStatus("12345", "completed", "final_review")**
+activate EvalSvc
+
+note right of EvalSvc #FFFDE7
+  **Service層のビジネスロジック (バリデーション):**
+  1. **validateWorkStatus("completed")**
+     許可値: not_started | in_progress
+     | completed | on_hold | cancelled
+  2. **validateCurrentStep("final_review")**
+     許可値: judgment | document_review
+     | field_survey | final_review
+  3. 不正値の場合は Error をスロー
+end note
+
+EvalSvc -> EvalRepo : **updateWorkStatus("12345", "completed", "final_review")**
+activate EvalRepo
+note right of EvalRepo
+  **Repository層 (SQLはここだけ):**
+  - INSERT INTO evaluation_statuses
+    ON CONFLICT ("evaluationNo") DO UPDATE
+  - workStatus と currentStep を更新
+  - updatedAt = NOW()
+  - RETURNING で更新後の行を返却
+end note
+
+EvalRepo -> DB : INSERT INTO evaluation_statuses\nVALUES ($1, $2, $3)\nON CONFLICT DO UPDATE\nRETURNING ...
+activate DB
+DB --> EvalRepo : updated row
+deactivate DB
+
+EvalRepo --> EvalSvc : { evaluationNo, workStatus,\n  currentStep, updatedAt }
+deactivate EvalRepo
+
+EvalSvc --> Router : updated evaluation status
+deactivate EvalSvc
+
+Router --> FE : 200 JSON response
+deactivate Router
+
+FE --> User : ステータス変更を画面に反映
+deactivate FE
+
+' ==================================================================
+' 5. 公告詳細 + GCS ドキュメント (GET /api/announcements/:no)
+' ==================================================================
+== 5. 公告詳細 + GCSドキュメント付与 (GET /api/announcements/:no) ==
+
+User -> FE : AnnouncementDetailPage へ遷移
+activate FE
+FE -> Router : GET /api/announcements/678
+activate Router
+
+Router -> AnnSvc : **getByNo(678)**
+activate AnnSvc
+
+AnnSvc -> AnnRepo : **findByNo(678)**
+activate AnnRepo
+note right of AnnRepo
+  **Repository層 (SQLはここだけ):**
+  - WITH documents_agg, competing_companies_agg
+  - bid_announcements LEFT JOIN documents_agg
+    LEFT JOIN competing_companies_agg
+  - documents に markdown_path を含む
+end note
+
+AnnRepo -> DB : SELECT ... WITH documents_agg AS (...)\nWHERE announcement_no = $1
+activate DB
+DB --> AnnRepo : announcement row
+deactivate DB
+
+AnnRepo --> AnnSvc : announcement object
+deactivate AnnRepo
+
+note right of AnnSvc #FFFDE7
+  **Service層:**
+  documents 配列が存在する場合
+  DocumentService で GCS コンテンツを付与
+end note
+
+AnnSvc -> DocSvc : **attachDocumentContents(documents[])**
+activate DocSvc
+
+DocSvc -> GcsUtil : **readMultipleMarkdownFromGCS(gcsPaths[], fallback)**
+activate GcsUtil
+
+GcsUtil -> GCS : **Promise.all([ file.download(), ... ])**
+activate GCS
+GCS --> GcsUtil : markdown contents[]
+deactivate GCS
+
+GcsUtil --> DocSvc : string[]
+deactivate GcsUtil
+
+DocSvc --> AnnSvc : documents[] with content
+deactivate DocSvc
+
+AnnSvc --> Router : announcement (documents に content 付き)
+deactivate AnnSvc
+
+Router --> FE : 200 JSON response
+deactivate Router
+
+FE --> User : 公告詳細画面 + ドキュメント内容表示
+deactivate FE
+
+' ==================================================================
+' Legend / Notes
+' ==================================================================
+
+note across #ECEFF1
+  **3層アーキテクチャの原則**
+  | 層 | 責務 | SQL | ビジネスロジック | GCS アクセス |
+  | Presentation (Controller) | ルーティング・レスポンス整形 | NG | NG | NG |
+  | Business Logic (Service) | バリデーション・ステータス判定・データ変換 | NG | OK (ここだけ) | DocumentService経由 |
+  | Data Access (Repository + GCS Util) | データ取得・保存 | OK (ここだけ) | NG | OK (ここだけ) |
+end note
+
+@enduml

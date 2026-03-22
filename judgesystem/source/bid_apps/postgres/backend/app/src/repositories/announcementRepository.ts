@@ -1,26 +1,7 @@
-import { PoolClient } from "pg";
 import { pool, TABLES, schemaPrefix } from "../config/database";
 import { FilterParams } from "../types";
-import { downloadFileFromGCS, readMultipleMarkdownFromGCS } from "../utils/gcs";
 
 export class AnnouncementRepository {
-  private getStatusExpression(): string {
-    return `
-      CASE
-        WHEN COALESCE(cbj.final_status, FALSE) THEN 'all_met'
-        WHEN
-          COALESCE(cbj.requirement_ineligibility, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_grade_item, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_location, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_experience, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_technician, FALSE) = TRUE
-          AND COALESCE(cbj.requirement_other, FALSE) = FALSE
-        THEN 'other_only_unmet'
-        ELSE 'unmet'
-      END
-    `;
-  }
-
   /**
    * Get paginated announcements list with filters
    * bid_announcements テーブルから一覧表示に必要な最小限のデータを取得
@@ -48,7 +29,6 @@ export class AnnouncementRepository {
       const pageSize = filters.pageSize || 25;
       const offset = page * pageSize;
 
-      // 一覧表示に必要な最小限のフィールドのみ取得
       const dataQuery = `
         SELECT
           CONCAT('ann-', announcement_no) AS id,
@@ -59,23 +39,7 @@ export class AnnouncementRepository {
           COALESCE("bidType", 'unknown') AS "bidType",
           COALESCE("workPlace", '') AS "workLocation",
           COALESCE("publishDate", '') AS "publishDate",
-          COALESCE("bidEndDate", '') AS deadline,
-
-          -- ステータスを締切日から動的に計算（文字列比較で安全に）
-          CASE
-            -- 締切が有効な日付形式でない場合は closed
-            WHEN "bidEndDate" IS NULL OR "bidEndDate" !~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-              THEN 'closed'
-            -- 締切まで14日以上 → upcoming (公告中) ※文字列比較
-            WHEN "bidEndDate" >= TO_CHAR(CURRENT_DATE + INTERVAL '14 days', 'YYYY-MM-DD')
-              THEN 'upcoming'
-            -- 締切前で14日以内 → ongoing (締切間近) ※文字列比較
-            WHEN "bidEndDate" >= TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
-              THEN 'ongoing'
-            -- 締切後 → awaiting_result (結果待)
-            ELSE 'awaiting_result'
-          END AS status
-
+          COALESCE("bidEndDate", '') AS deadline
         FROM ${schemaPrefix}bid_announcements
         ${whereClause}
         ${orderByClause}
@@ -177,17 +141,6 @@ export class AnnouncementRepository {
           COALESCE(a."bidEndDate", '') AS "bidEndDate",
           COALESCE(a."bidEndDate", '') AS deadline,
 
-          -- ステータスを締切日から動的に計算（文字列比較で安全に）
-          CASE
-            WHEN a."bidEndDate" IS NULL OR a."bidEndDate" !~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-              THEN 'closed'
-            WHEN a."bidEndDate" >= TO_CHAR(CURRENT_DATE + INTERVAL '14 days', 'YYYY-MM-DD')
-              THEN 'upcoming'
-            WHEN a."bidEndDate" >= TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
-              THEN 'ongoing'
-            ELSE 'awaiting_result'
-          END AS status,
-
           -- 見積金額・落札金額（今後別テーブルから取得予定、現在は NULL）
           NULL::integer AS "estimatedAmountMin",
           NULL::integer AS "estimatedAmountMax",
@@ -211,46 +164,18 @@ export class AnnouncementRepository {
         return null;
       }
 
-      const announcement = result.rows[0];
-
-      // documents の各アイテムについて、markdown_path から content を並列一括取得
-      if (announcement.documents && Array.isArray(announcement.documents)) {
-        const fallback = '文字起こしデータがありません';
-
-        // GCS パスを収集し、有効なパスのインデックスを記録
-        const gcsPaths: string[] = [];
-        const gcsIndexMap: number[] = [];
-        announcement.documents.forEach((doc: any, i: number) => {
-          if (doc.markdown_path && doc.markdown_path.startsWith('gs://')) {
-            gcsPaths.push(doc.markdown_path);
-            gcsIndexMap.push(i);
-          }
-        });
-
-        // 全 GCS パスを並列で一括取得（個別失敗はフォールバック値）
-        const contents = await readMultipleMarkdownFromGCS(gcsPaths, fallback);
-
-        // 結果をドキュメントにマッピング
-        announcement.documents = announcement.documents.map((doc: any, i: number) => {
-          const gcsIdx = gcsIndexMap.indexOf(i);
-          const content = gcsIdx !== -1 ? contents[gcsIdx] : fallback;
-          return { ...doc, content, markdown_path: undefined };
-        });
-      }
-
-      return announcement;
+      return result.rows[0];
     } finally {
       client.release();
     }
   }
 
   /**
-   * Get progressing companies (in_progress / completed) for a given announcement
+   * Get progressing companies (raw data - Service computes statuses)
    */
   async findProgressingCompanies(announcementNo: number): Promise<any[]> {
     const client = await pool.connect();
     try {
-      const statusExpression = this.getStatusExpression();
       const result = await client.query(
         `
         SELECT
@@ -262,9 +187,14 @@ export class AnnouncementRepository {
           COALESCE(om.office_name, '') AS "branchName",
           COALESCE(om.office_address, '') AS "branchAddress",
           COALESCE(cm.company_address, '') AS "companyAddress",
-          1 AS priority,
-          COALESCE(evs."workStatus", 'not_started') AS "workStatus",
-          ${statusExpression} AS "evaluationStatus",
+          cbj.final_status AS "finalStatus",
+          cbj.requirement_ineligibility AS "requirementIneligibility",
+          cbj.requirement_grade_item AS "requirementGradeItem",
+          cbj.requirement_location AS "requirementLocation",
+          cbj.requirement_experience AS "requirementExperience",
+          cbj.requirement_technician AS "requirementTechnician",
+          cbj.requirement_other AS "requirementOther",
+          evs."workStatus" AS "workStatus",
           COALESCE(evs."updatedAt", cbj."updatedDate"::timestamptz) AS "updatedAt"
         FROM ${schemaPrefix}company_bid_judgement cbj
         JOIN ${schemaPrefix}company_master cm
@@ -350,7 +280,38 @@ export class AnnouncementRepository {
   }
 
   /**
-   * Build WHERE clause from filters
+   * Get document metadata for a specific document (data only, no GCS)
+   */
+  async findDocumentMeta(announcementNo: number, documentId: string): Promise<any | null> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT
+          document_id,
+          title,
+          "fileFormat",
+          save_path,
+          url
+        FROM ${schemaPrefix}announcements_documents_master
+        WHERE announcement_id = $1
+          AND document_id = $2
+        `,
+        [announcementNo, documentId]
+      );
+
+      if (result.rowCount === 0) {
+        return null;
+      }
+
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Build WHERE clause from filters (pure data column filters only)
    * bid_announcements テーブルのカラム名に対応
    */
   private buildWhereClause(filters: FilterParams): {
@@ -361,38 +322,6 @@ export class AnnouncementRepository {
     const whereClauses: string[] = [];
     const queryParams: any[] = [];
     let paramIndex = 1;
-
-    // ステータスフィルター（文字列比較で安全に）
-    if (filters.statuses && filters.statuses.length > 0) {
-      const statusConditions = filters.statuses.map(status => {
-        switch (status) {
-          case 'upcoming':
-            return `(
-              "bidEndDate" ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-              AND "bidEndDate" >= TO_CHAR(CURRENT_DATE + INTERVAL '14 days', 'YYYY-MM-DD')
-            )`;
-          case 'ongoing':
-            return `(
-              "bidEndDate" ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-              AND "bidEndDate" >= TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
-              AND "bidEndDate" < TO_CHAR(CURRENT_DATE + INTERVAL '14 days', 'YYYY-MM-DD')
-            )`;
-          case 'awaiting_result':
-            return `(
-              "bidEndDate" ~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-              AND "bidEndDate" < TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
-            )`;
-          case 'closed':
-            return `(
-              "bidEndDate" IS NULL
-              OR "bidEndDate" !~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-            )`;
-          default:
-            return 'FALSE';
-        }
-      }).join(' OR ');
-      whereClauses.push(`(${statusConditions})`);
-    }
 
     if (filters.bidTypes && filters.bidTypes.length > 0) {
       // 'unknown' が含まれている場合は NULL や空文字も含める
@@ -458,7 +387,7 @@ export class AnnouncementRepository {
   }
 
   /**
-   * Build ORDER BY clause
+   * Build ORDER BY clause (data column sorting only)
    * bid_announcements テーブルのカラム名に対応
    */
   private buildOrderByClause(sortField?: string, sortOrder?: string): string {
@@ -468,17 +397,6 @@ export class AnnouncementRepository {
     const fieldMap: Record<string, string> = {
       announcementNo: 'announcement_no',
       no: 'announcement_no',
-      status: `(
-        CASE
-          WHEN "bidEndDate" IS NULL OR "bidEndDate" !~ '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
-            THEN 4
-          WHEN "bidEndDate" >= TO_CHAR(CURRENT_DATE + INTERVAL '14 days', 'YYYY-MM-DD')
-            THEN 1
-          WHEN "bidEndDate" >= TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
-            THEN 2
-          ELSE 3
-        END
-      )`,
       bidType: '"bidType"',
       title: '"workName"',
       organization: '"topAgencyName"',
@@ -506,57 +424,5 @@ export class AnnouncementRepository {
     }
 
     return '';
-  }
-
-  /**
-   * 指定した資料ファイルを GCS から取得
-   */
-  async getDocumentFile(announcementNo: number, documentId: string): Promise<{ data: Buffer; fileFormat: string; title: string } | null> {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `
-        SELECT
-          document_id,
-          title,
-          "fileFormat",
-          save_path,
-          url
-        FROM ${schemaPrefix}announcements_documents_master
-        WHERE announcement_id = $1
-          AND document_id = $2
-        `,
-        [announcementNo, documentId]
-      );
-
-      if (result.rowCount === 0) {
-        return null;
-      }
-
-      const row = result.rows[0] as {
-        document_id: number;
-        title: string;
-        fileFormat: string | null;
-        save_path: string | null;
-        url: string | null;
-      };
-
-      const gcsPath = row.save_path?.startsWith('gs://') ? row.save_path : undefined;
-      if (!gcsPath) {
-        const message = `Document ${documentId} for announcement ${announcementNo} has no GCS save_path`;
-        console.warn(message);
-        throw new Error("Document file not found in storage");
-      }
-
-      const fileBuffer = await downloadFileFromGCS(gcsPath);
-
-      return {
-        data: fileBuffer,
-        fileFormat: row.fileFormat || 'pdf',
-        title: row.title || `document-${row.document_id}`,
-      };
-    } finally {
-      client.release();
-    }
   }
 }

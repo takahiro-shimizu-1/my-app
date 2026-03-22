@@ -1,0 +1,255 @@
+@startuml architecture
+!theme plain
+title 入札案件審査システム - 3層アーキテクチャ図\n(Google Cloud 上で稼働)
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam defaultFontName "Noto Sans CJK JP"
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam package {
+  BackgroundColor<<presentation>> #E3F2FD
+  BackgroundColor<<business>> #FFF3E0
+  BackgroundColor<<data>> #E8F5E9
+  BorderColor #546E7A
+  FontSize 14
+}
+skinparam component {
+  FontSize 12
+}
+skinparam note {
+  FontSize 11
+  BackgroundColor #FFFDE7
+}
+
+' ==================================================================
+' Actors
+' ==================================================================
+actor "利用者\n(User)" as User
+actor "管理者\n(Admin)" as Admin
+
+' ==================================================================
+' Google Cloud boundary
+' ==================================================================
+cloud "Google Cloud Platform" as GCP {
+
+  ' ================================================================
+  ' Presentation層 (Controller + View)
+  ' ================================================================
+  package "Presentation層\n(Controller + View)" <<presentation>> {
+
+    package "Frontend (React SPA)\nCloud Run" as FE {
+      component "App.tsx\nReact Router" as AppRouter
+      component "BidListPage" as BidList
+      component "BidDetailPage" as BidDetail
+      component "AnnouncementListPage" as AnnList
+      component "AnnouncementDetailPage" as AnnDetail
+      component "PartnerListPage" as PartnerList
+      component "PartnerDetailPage" as PartnerDetail
+      component "OrdererListPage" as OrdererList
+      component "OrdererDetailPage" as OrdererDetail
+      component "StaffListPage" as StaffList
+      component "AnalyticsPage" as Analytics
+      component "MasterRegisterPage" as MasterReg
+    }
+
+    package "Backend Controllers\n(Express Router - index.ts)\nCloud Run" as BE_CTRL {
+      component "EvaluationController" as EvalCtrl {
+        portin "GET /api/evaluations" as ep_eval_list
+        portin "GET /api/evaluations/:id" as ep_eval_id
+        portin "GET /api/evaluations/stats" as ep_eval_stats
+        portin "GET /api/evaluations/status-counts" as ep_eval_sc
+        portin "PATCH /api/evaluations/:evaluationNo" as ep_eval_patch
+        portin "GET  .../assignees" as ep_eval_assign_get
+        portin "PUT  .../assignees" as ep_eval_assign_put
+      }
+      component "AnnouncementController" as AnnCtrl {
+        portin "GET /api/announcements" as ep_ann_list
+        portin "GET /api/announcements/:no" as ep_ann_no
+        portin "GET .../progressing-companies" as ep_ann_prog
+        portin "GET .../similar-cases" as ep_ann_sim
+        portin "GET .../documents/:id/preview" as ep_ann_doc
+      }
+      component "PartnerController" as PartnerCtrl
+      component "OrdererController" as OrdererCtrl
+      component "ContactController" as ContactCtrl
+      component "CompanyController" as CompanyCtrl
+    }
+  }
+
+  ' ================================================================
+  ' Business Logic層 (Service)
+  ' ================================================================
+  package "Business Logic層\n(Service)" <<business>> {
+
+    component "EvaluationService" as EvalSvc {
+      port "getList()" as svc_eval_list
+      port "getById()" as svc_eval_byid
+      port "updateWorkStatus()" as svc_eval_update
+      port "getStats()" as svc_eval_stats
+      port "getStatusCounts()" as svc_eval_sc
+    }
+    note right of EvalSvc
+      **ビジネスロジック:**
+      - determineEvaluationStatus()
+        要件フラグ -> all_met / other_only_unmet / unmet
+      - validateWorkStatus()
+        ステータス値の妥当性検証
+      - validateCurrentStep()
+        ステップ値の妥当性検証
+      - defaultWorkStatus() / defaultCurrentStep()
+        / defaultPriority()
+        NULL時のデフォルト値適用
+    end note
+
+    component "AnnouncementService" as AnnSvc {
+      port "getList()" as svc_ann_list
+      port "getByNo()" as svc_ann_byno
+      port "getProgressingCompanies()" as svc_ann_prog
+      port "getSimilarCases()" as svc_ann_sim
+      port "getDocumentPreview()" as svc_ann_doc
+    }
+    note right of AnnSvc
+      **ビジネスロジック:**
+      - determineAnnouncementStatus()
+        bidEndDate -> upcoming / ongoing
+        / awaiting_result / closed
+      - normalizeBidType()
+        NULL/空文字 -> 'unknown'
+      - filterByStatuses() / sortByStatus()
+        ステータスによるフィルタ・ソート
+    end note
+
+    component "DocumentService" as DocSvc {
+      port "attachDocumentContents()" as svc_doc_attach
+      port "downloadDocument()" as svc_doc_dl
+    }
+    note right of DocSvc
+      **ビジネスロジック:**
+      - markdown_path の gs:// バリデーション
+      - Promise.all による並列バッチ取得
+      - フォールバック: "文字起こしデータがありません"
+      - markdown_path を content に変換して返却
+    end note
+  }
+
+  ' ================================================================
+  ' Data Access層 (Repository)
+  ' ================================================================
+  package "Data Access層\n(Repository)" <<data>> {
+
+    component "EvaluationRepository" as EvalRepo {
+      port "findWithFilters()" as repo_eval_find
+      port "findById()" as repo_eval_byid
+      port "updateWorkStatus()" as repo_eval_update
+      port "getStats()" as repo_eval_stats
+      port "getStatusCountsRaw()" as repo_eval_sc
+    }
+    note right of EvalRepo
+      **データI/Oのみ (SQLはここだけ)**
+      - company_bid_judgement
+      - bid_announcements
+      - company_master / office_master
+      - announcements_documents_master
+      - evaluation_statuses
+      - evaluation_assignees
+      - announcements_estimated_amounts
+    end note
+
+    component "AnnouncementRepository" as AnnRepo {
+      port "findWithFilters()" as repo_ann_find
+      port "findByNo()" as repo_ann_byno
+      port "findProgressingCompanies()" as repo_ann_prog
+      port "findSimilarCases()" as repo_ann_sim
+      port "findDocumentMeta()" as repo_ann_docmeta
+      port "getDocumentFile()" as repo_ann_docfile
+    }
+    note right of AnnRepo
+      **データI/Oのみ (SQLはここだけ)**
+      - bid_announcements
+      - announcements_documents_master
+      - announcements_competing_companies_master
+      - announcements_competing_company_bids_master
+      - similar_cases_master
+      - similar_cases_competitors
+    end note
+
+    component "GCS Utility\n(utils/gcs.ts)" as GcsUtil {
+      port "readMarkdownFromGCS()" as gcs_read
+      port "readMultipleMarkdownFromGCS()" as gcs_multi
+      port "downloadFileFromGCS()" as gcs_download
+    }
+    note right of GcsUtil
+      **外部ストレージI/O**
+      - @google-cloud/storage SDK
+      - gs:// パスのパース
+      - Buffer / UTF-8 変換
+    end note
+  }
+
+  ' ================================================================
+  ' External Data Stores
+  ' ================================================================
+  database "PostgreSQL\n(Cloud SQL)" as CloudSQL {
+    storage "案件データ\n(bid_announcements\ncompany_bid_judgement\nevaluation_statuses\n...)" as CaseData
+  }
+
+  storage "Cloud Storage\n(GCS)" as GCS {
+    file "入札案件データ\n(Excel / PDF)" as ExcelPdf
+    file "OCR解析結果データ\n(Markdown)" as OcrData
+  }
+}
+
+' ==================================================================
+' Connections: Actors -> Presentation
+' ==================================================================
+User -down-> AppRouter : ブラウザアクセス
+Admin -down-> AppRouter : ブラウザアクセス
+AppRouter -down-> BidList
+AppRouter -down-> BidDetail
+AppRouter -down-> AnnList
+AppRouter -down-> AnnDetail
+AppRouter -down-> Analytics
+AppRouter -down-> PartnerList
+AppRouter -down-> StaffList
+AppRouter -down-> MasterReg
+
+BidList -down-> EvalCtrl : HTTP REST
+BidDetail -down-> EvalCtrl : HTTP REST
+AnnList -down-> AnnCtrl : HTTP REST
+AnnDetail -down-> AnnCtrl : HTTP REST
+Analytics -down-> EvalCtrl : HTTP REST
+
+' ==================================================================
+' Connections: Controller -> Service
+' ==================================================================
+EvalCtrl -down-> EvalSvc : 委譲
+AnnCtrl -down-> AnnSvc : 委譲
+
+' ==================================================================
+' Connections: Service -> Repository / DocumentService
+' ==================================================================
+EvalSvc -down-> EvalRepo : データ取得/更新
+EvalSvc -right-> DocSvc : ドキュメント付与
+AnnSvc -down-> AnnRepo : データ取得
+AnnSvc -right-> DocSvc : ドキュメント付与
+
+' ==================================================================
+' Connections: Repository -> External
+' ==================================================================
+EvalRepo -down-> CloudSQL : SQL Query\n(pool.connect)
+AnnRepo -down-> CloudSQL : SQL Query\n(pool.connect)
+DocSvc -down-> GcsUtil : GCS操作委譲
+GcsUtil -down-> GCS : Storage API
+
+' ==================================================================
+' Legend
+' ==================================================================
+legend bottom
+  |= 層 |= 責務 |= 実装ルール |
+  | **Presentation層**\n(Controller + View) | リクエストルーティング\nUIレンダリング | ビジネスロジック禁止\nServiceに委譲するだけ |
+  | **Business Logic層**\n(Service) | ビジネスルール\nステータス判定\nバリデーション\n計算・変換 | SQL禁止\nRepositoryからデータ取得し加工 |
+  | **Data Access層**\n(Repository) | データI/O\nSQL実行\nGCSファイル操作 | SQLはここだけ\nビジネスロジック禁止\nデータの取得・保存のみ |
+endlegend
+
+@enduml
