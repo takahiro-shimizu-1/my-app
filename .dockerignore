@@ -2,8 +2,6 @@
 .github
 .next
 node_modules
-apps/*/.next
-apps/*/node_modules
 .skill-bus
 .agent-skill-bus
 .gitnexus

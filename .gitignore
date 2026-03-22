@@ -1,8 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-node_modules/
-**/node_modules/
+/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,22 +11,16 @@ node_modules/
 !.yarn/versions
 
 # testing
-coverage/
-**/coverage/
+/coverage
 
-# next.js / build outputs
+# next.js
 /.next/
 /out/
-**/.next/
-**/out/
-**/build/
-**/dist/
 
 # tool runtime state
 /.skill-bus/
 /.agent-skill-bus/
 /.gitnexus/
-/.npm-bootstrap.lock/
 /skills/**/prompt-request-queue.jsonl
 /skills/**/active-locks.jsonl
 /skills/**/dag-state.jsonl
@@ -59,4 +52,4 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-**/next-env.d.ts
+next-env.d.ts

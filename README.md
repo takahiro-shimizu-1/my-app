@@ -1,16 +1,15 @@
 # my-app
 
-Docker-first monorepo for building multiple apps under one Miyabi-managed repository.
+Docker-first single-application repository with Miyabi, agent-skill-bus, and optional gitnexus-stable-ops support.
 
-Detailed workspace rules live in `docs/monorepo.md`.
+Repo architecture and setup rules live in `docs/repo-guide.md`.
 
 ## Structure
 
 ```text
 my-app/
-├── apps/
-│   └── web/               # Current Next.js + TypeScript + App Router app
-├── packages/              # Shared libraries for future apps
+├── app/                   # Next.js + TypeScript + App Router app
+├── public/                # Static assets
 ├── docker/                # Development image definition
 ├── scripts/               # Repo-level helpers
 ├── .claude/               # Miyabi / Claude operational config
@@ -19,7 +18,7 @@ my-app/
 └── package.json           # Monorepo entrypoint
 ```
 
-Each app lives in its own workspace under `apps/`, so the stack can vary per app. Right now `apps/web` is a Next.js app, but future apps can be other Next.js apps or different runtimes as long as they expose `dev`, `build`, `start`, and `lint` scripts.
+This repository is for one application only. If you start another product, create another repository next to this one and apply the same tooling there.
 
 ## Development
 
@@ -29,7 +28,7 @@ The repository is designed to run without installing project dependencies on you
 
 ```bash
 docker compose build
-docker compose up web
+docker compose up app
 ```
 
 This starts the default app at `http://localhost:3000`.
@@ -48,11 +47,11 @@ npm run miyabi:doctor
 npm run asb:dashboard
 ```
 
-The Docker setup mounts the parent `package/` directory so the local `Miyabi/` and `agent-skill-bus/` sibling repositories are available inside the container too.
+The Docker setup mounts the parent `package/` directory so the local `Miyabi/`, `agent-skill-bus/`, and `gitnexus-stable-ops/` sibling repositories are available inside the container too.
 
 ### Host workflow
 
-If you want to run from the host anyway, root scripts proxy to the default app:
+If you want to run from the host anyway, the root scripts directly operate on this app:
 
 ```bash
 npm install
@@ -61,31 +60,21 @@ npm run build
 npm run lint
 ```
 
-## Running Other Apps Later
+## Creating Another App
 
-The root scripts are app-aware:
+If you need another independent app:
 
-```bash
-APP_NAME=web npm run app:dev
-APP_NAME=web npm run app:build
-APP_NAME=web npm run app:lint
-```
+1. create a new sibling directory such as `/home/shimizu/study/AI/hayashi/package/app-b`
+2. create a new GitHub repository for that app
+3. copy this repository structure or bootstrap a new app and apply `Miyabi` there
+4. keep its `.claude/`, `.skill-bus/`, `.gitnexus/`, Issues, PRs, and workflows separate
 
-When you add a new workspace such as `apps/admin`, the same commands work as long as that app has matching npm scripts.
-
-## Adding a New App
-
-1. Create a new workspace under `apps/<name>`.
-2. Give it a package name like `@my-app/<name>`.
-3. Add `dev`, `build`, `start`, and `lint` scripts in that app's `package.json`.
-4. Run it with `APP_NAME=<name> npm run app:dev` or add a dedicated Docker service if it needs different ports or services.
-
-For the full conventions and examples, see `docs/monorepo.md`.
+For the full conventions and examples, see `docs/repo-guide.md`.
 
 ## Miyabi and Tooling
 
 Repo-level automation stays at the repository root:
 
-- `Miyabi` manages GitHub workflows, labels, and agent orchestration.
+- `Miyabi` manages GitHub workflows, labels, and agent orchestration for this repository.
 - `agent-skill-bus` tracks skill health and queue state in `.skill-bus/`.
 - `gitnexus-stable-ops` remains optional until the host or container can run a compatible `gitnexus-stable` binary.

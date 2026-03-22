@@ -1,14 +1,13 @@
 name: my-app
 
-x-workspace-base: &workspace-base
+x-app-base: &app-base
   build:
     context: .
-    dockerfile: docker/Dockerfile.workspace
+    dockerfile: docker/Dockerfile.app
   entrypoint:
     - ./scripts/docker-bootstrap.sh
   working_dir: /workspace/my-app
   environment:
-    APP_NAME: ${APP_NAME:-web}
     APP_PORT: ${APP_PORT:-3000}
     GH_TOKEN: ${GH_TOKEN:-}
     GITHUB_TOKEN: ${GITHUB_TOKEN:-}
@@ -20,19 +19,19 @@ x-workspace-base: &workspace-base
   volumes:
     - ..:/workspace
     - my-app-node-modules:/workspace/my-app/node_modules
-    - web-next-cache:/workspace/my-app/apps/web/.next
+    - next-cache:/workspace/my-app/.next
     - npm-cache:/root/.npm
     - ${HOME}/.config/gh:/root/.config/gh:ro
 
 services:
   workspace:
-    <<: *workspace-base
+    <<: *app-base
     command:
       - sleep
       - infinity
 
-  web:
-    <<: *workspace-base
+  app:
+    <<: *app-base
     ports:
       - "${APP_PORT:-3000}:3000"
     command:
@@ -42,5 +41,5 @@ services:
 
 volumes:
   my-app-node-modules:
-  web-next-cache:
+  next-cache:
   npm-cache:

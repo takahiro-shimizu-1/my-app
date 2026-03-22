@@ -1,19 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stamp_file="node_modules/.workspace-lock.sha"
-lock_dir=".npm-bootstrap.lock"
-hash_inputs=(
-  "package-lock.json"
-  "package.json"
-)
-
-while IFS= read -r package_file; do
-  hash_inputs+=("$package_file")
-done < <(find apps packages -mindepth 2 -maxdepth 2 -name package.json -type f 2>/dev/null | sort)
-
+stamp_file="node_modules/.install-lock.sha"
+lock_dir="node_modules/.npm-bootstrap.lock"
 current_hash="$(
-  sha256sum "${hash_inputs[@]}" | sha256sum | awk '{print $1}'
+  sha256sum package.json package-lock.json | sha256sum | awk '{print $1}'
 )"
 
 needs_install() {
