@@ -121,6 +121,26 @@ Example:
 /home/shimizu/study/AI/hayashi/package/app-b
 ```
 
+## Autonomous Local Runner
+
+Issues labelled `🤖agent-execute` (or triggered via `/agent` comments) are
+processed by the `autonomous-agent.yml` workflow. The `execute-agents` job runs
+on a self-hosted PC runner with the label **`my-app-local`** (`[self-hosted,
+linux, x64, my-app-local]`).
+
+The runner relies on a **local Claude Code login** — no API key is passed
+through GitHub Actions secrets for this step. Before the pipeline executes it
+checks `claude auth status`; if the session is not authenticated the run is
+skipped and a comment is posted on the issue.
+
+To set up or restore the runner:
+
+1. Register a GitHub Actions self-hosted runner on the PC and assign the
+   `my-app-local` label.
+2. Log into Claude Code interactively on that machine (`claude login`).
+3. Start the runner service — the workflow will pick up labelled issues
+   automatically.
+
 ## Current Stack
 
 This repository currently uses:
