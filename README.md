@@ -2,6 +2,8 @@
 
 Docker-first monorepo for building multiple apps under one Miyabi-managed repository.
 
+Detailed workspace rules live in `docs/monorepo.md`.
+
 ## Structure
 
 ```text
@@ -77,6 +79,8 @@ When you add a new workspace such as `apps/admin`, the same commands work as lon
 2. Give it a package name like `@my-app/<name>`.
 3. Add `dev`, `build`, `start`, and `lint` scripts in that app's `package.json`.
 4. Run it with `APP_NAME=<name> npm run app:dev` or add a dedicated Docker service if it needs different ports or services.
+
+For the full conventions and examples, see `docs/monorepo.md`.
 
 ## Miyabi and Tooling
 

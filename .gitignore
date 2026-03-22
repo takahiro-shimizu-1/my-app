@@ -27,6 +27,7 @@ coverage/
 /.skill-bus/
 /.agent-skill-bus/
 /.gitnexus/
+/.npm-bootstrap.lock/
 /skills/**/prompt-request-queue.jsonl
 /skills/**/active-locks.jsonl
 /skills/**/dag-state.jsonl
