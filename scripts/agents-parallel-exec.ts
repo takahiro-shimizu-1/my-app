@@ -286,7 +286,7 @@ async function runVerificationSuite(): Promise<VerificationResult[]> {
 }
 
 async function runStateCommand(action: 'transition' | 'assign-agent', args: string[], token: string) {
-  const scriptArgs = ['tsx', 'scripts/label-state-machine.ts', action, ...args];
+  const scriptArgs = ['tsx', 'scripts/label-state-machine.ts', action, ...toEqualsArgs(args)];
   await runCommand(npxCommand(), scriptArgs, {
     env: {
       ...process.env,
@@ -294,6 +294,21 @@ async function runStateCommand(action: 'transition' | 'assign-agent', args: stri
       GH_TOKEN: token,
     },
   });
+}
+
+function toEqualsArgs(args: string[]) {
+  const result: string[] = [];
+
+  for (let index = 0; index < args.length; index += 2) {
+    const key = args[index];
+    const value = args[index + 1];
+    if (!key || value === undefined) {
+      continue;
+    }
+    result.push(`${key}=${value}`);
+  }
+
+  return result;
 }
 
 async function createIssueComment(octokit: Octokit, repo: RepoInfo, issueNumber: number, body: string) {
