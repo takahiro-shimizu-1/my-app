@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x-data-grid';
 import { extractPrefecture } from '../constants/prefectures';
-import type { EvaluationStatus, FilterState } from '../types';
+import type { EvaluationStatus, FilterState, EvaluationApiItem, EvaluationListRow } from '../types';
 import { fetchEvaluations, fetchStatusCounts } from '../data/api';
 
 // ナビゲーション追跡用のsessionStorageキー
@@ -116,7 +116,7 @@ export function useBidListState() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // API状態
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [rows, setRows] = useState<EvaluationListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,27 +199,22 @@ export function useBidListState() {
             throw new Error('Invalid API response: data is not an array');
           }
 
-          const mapped = result.data.map((e: Record<string, unknown>) => {
-            const announcement = e.announcement as Record<string, unknown> | undefined;
-            const company = e.company as Record<string, unknown> | undefined;
-            const branch = e.branch as Record<string, unknown> | undefined;
-            return {
-              id: e.id,
-              evaluationNo: e.evaluationNo,
-              status: e.status,
-              workStatus: e.workStatus,
-              priority: (company?.priority as number) || 0,
-              title: (announcement?.title as string) || '',
-              company: (company?.name as string) || '',
-              branch: (branch?.name as string) || '',
-              organization: (announcement?.organization as string) || '',
-              category: (announcement?.category as string) || '',
-              bidType: announcement?.bidType,
-              deadline: (announcement?.deadline as string) || '',
-              evaluatedAt: e.evaluatedAt ? (e.evaluatedAt as string).substring(0, 10) : '',
-              prefecture: extractPrefecture((announcement?.workLocation as string) || '') ?? '',
-            };
-          });
+          const mapped = result.data.map((e: EvaluationApiItem): EvaluationListRow => ({
+            id: e.id,
+            evaluationNo: e.evaluationNo,
+            status: e.status,
+            workStatus: e.workStatus,
+            priority: e.company?.priority || 0,
+            title: e.announcement?.title || '',
+            company: e.company?.name || '',
+            branch: e.branch?.name || '',
+            organization: e.announcement?.organization || '',
+            category: e.announcement?.category || '',
+            bidType: e.announcement?.bidType,
+            deadline: e.announcement?.deadline || '',
+            evaluatedAt: e.evaluatedAt ? e.evaluatedAt.substring(0, 10) : '',
+            prefecture: extractPrefecture(e.announcement?.workLocation || '') ?? '',
+          }));
 
           setRows(mapped);
           setTotalCount(result.total);

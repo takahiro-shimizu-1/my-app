@@ -6,6 +6,7 @@
  */
 import { getApiUrl } from '../../config/api';
 import type { AnnouncementFilterState } from '../../components/announcement';
+import type { AnnouncementListRow } from '../../types';
 import type { GridSortModel } from '@mui/x-data-grid';
 
 // -- Request / Response types ------------------------------------------------
@@ -21,7 +22,7 @@ export interface FetchAnnouncementsParams {
 
 /** Shape returned by the announcements list endpoint. */
 export interface AnnouncementsResponse {
-  data: Record<string, unknown>[];
+  data: AnnouncementListRow[];
   total: number;
 }
 

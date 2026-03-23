@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import type { PastProject } from '../types/partner';
+import type { PastProject, PartnerDetail } from '../types/partner';
 import { fetchPartnerDetail } from '../data/api';
 import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 
@@ -27,7 +27,7 @@ export interface ProjectFilterState {
 // -- Constants --
 
 const WORK_STATUS_ORDER: Record<WorkStatus, number> = {
-  not_started: 0, in_progress: 1, completed: 2,
+  not_started: 0, in_progress: 1, completed: 2, on_hold: 3, cancelled: 4,
 };
 const EVALUATION_STATUS_ORDER: Record<EvaluationStatus, number> = {
   all_met: 0, other_only_unmet: 1, unmet: 2,
@@ -47,7 +47,7 @@ export function usePartnerDetail() {
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState(0);
-  const [partner, setPartner] = useState<any>(null);
+  const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +71,7 @@ export function usePartnerDetail() {
       setError(null);
       try {
         const data = await fetchPartnerDetail(id);
-        setPartner(data);
+        setPartner(data as PartnerDetail);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {

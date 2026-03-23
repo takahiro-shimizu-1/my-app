@@ -5,6 +5,7 @@
  * No React state or hooks -- those belong in the hook layer.
  */
 import { getApiUrl } from '../../config/api';
+import type { PartnerDetail } from '../../types/partner';
 
 /**
  * Fetch a partner detail by ID.
@@ -18,7 +19,7 @@ import { getApiUrl } from '../../config/api';
 export async function fetchPartnerDetail(
   id: string,
   options?: { signal?: AbortSignal },
-): Promise<Record<string, unknown>> {
+): Promise<PartnerDetail> {
   const response = await fetch(
     getApiUrl(`/api/partners/${id}`),
     options?.signal ? { signal: options.signal } : undefined,
@@ -26,5 +27,5 @@ export async function fetchPartnerDetail(
   if (!response.ok) {
     throw new Error(`Failed to fetch partner: ${response.status}`);
   }
-  return response.json();
+  return response.json() as Promise<PartnerDetail>;
 }

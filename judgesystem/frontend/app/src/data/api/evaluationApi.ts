@@ -5,7 +5,7 @@
  * No React state or hooks -- those belong in the hook layer.
  */
 import { getApiUrl } from '../../config/api';
-import type { EvaluationStatus, WorkStatus } from '../../types';
+import type { EvaluationStatus, WorkStatus, EvaluationApiItem } from '../../types';
 import type { FilterState } from '../../types';
 import type { GridSortModel } from '@mui/x-data-grid';
 
@@ -63,7 +63,7 @@ export interface FetchEvaluationsParams {
 
 /** Shape returned by the evaluations list endpoint. */
 export interface EvaluationsResponse {
-  data: Record<string, unknown>[];
+  data: EvaluationApiItem[];
   total: number;
 }
 
