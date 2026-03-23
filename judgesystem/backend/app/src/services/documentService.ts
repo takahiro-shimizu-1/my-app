@@ -5,12 +5,33 @@ import {
 
 const FALLBACK_CONTENT = "文字起こしデータがありません";
 
+/** GCS operations interface for dependency injection. */
+export interface GcsOperations {
+  readMultipleMarkdown: (paths: string[], fallback: string) => Promise<string[]>;
+  downloadFile: (path: string) => Promise<Buffer>;
+}
+
+/** Default GCS operations using the real GCS utility functions. */
+const defaultGcsOperations: GcsOperations = {
+  readMultipleMarkdown: readMultipleMarkdownFromGCS,
+  downloadFile: downloadFileFromGCS,
+};
+
 /**
  * Shared service for GCS document operations.
  * Centralizes all GCS-related business logic so that
  * repositories stay pure data-access and never touch GCS.
+ *
+ * Accepts an optional `GcsOperations` dependency for testability.
+ * When omitted, the real GCS utility functions are used.
  */
 export class DocumentService {
+  private gcs: GcsOperations;
+
+  constructor(gcs?: GcsOperations) {
+    this.gcs = gcs ?? defaultGcsOperations;
+  }
+
   /**
    * Batch-fetch markdown content from GCS for an array of documents.
    * Each document is expected to have an optional `markdown_path` field.
@@ -34,7 +55,7 @@ export class DocumentService {
     });
 
     // Parallel batch fetch (individual failures fall back gracefully)
-    const contents = await readMultipleMarkdownFromGCS(
+    const contents = await this.gcs.readMultipleMarkdown(
       gcsPaths,
       FALLBACK_CONTENT
     );
@@ -55,6 +76,6 @@ export class DocumentService {
     if (!gcsPath || !gcsPath.startsWith("gs://")) {
       throw new Error("Invalid GCS path: must start with gs://");
     }
-    return downloadFileFromGCS(gcsPath);
+    return this.gcs.downloadFile(gcsPath);
   }
 }
