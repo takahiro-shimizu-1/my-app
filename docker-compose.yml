@@ -97,6 +97,22 @@ services:
     command: >
       bash -c "npm install && npx vite --host 0.0.0.0 --port 5173"
 
+  judgesystem-judgment:
+    build:
+      context: ./judgesystem/judgment-engine
+      dockerfile: Dockerfile
+    depends_on:
+      judgesystem-db:
+        condition: service_healthy
+    environment:
+      PGHOST: judgesystem-db
+      PGPORT: "5432"
+      PGDATABASE: judgesystem
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "8082:8000"
+
 volumes:
   my-app-node-modules:
   next-cache:
