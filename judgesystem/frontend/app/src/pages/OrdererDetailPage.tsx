@@ -28,7 +28,8 @@ import {
   FilterAlt as FilterIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { mockOrderers, ordererCategoryConfig, announcementStatusConfig, bidTypeConfig } from '../data';
+import { ordererCategoryConfig, announcementStatusConfig, bidTypeConfig } from '../data';
+import { useOrderers } from '../hooks';
 import { categories } from '../constants/categories';
 import { bidTypes } from '../constants/bidType';
 import { prefecturesByRegion } from '../constants/prefectures';
@@ -748,6 +749,7 @@ export default function OrdererDetailPage() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(0);
   const { rightPanelOpen, toggleRightPanel, closeRightPanel, isMobile } = useSidebar();
+  const { orderers } = useOrderers();
   const [conditionTab, setConditionTab] = useState<'sort' | 'filter'>('sort');
 
   // 詳細ページのパスを保存（一覧に戻った時のページ復元用）
@@ -774,7 +776,7 @@ export default function OrdererDetailPage() {
     }
   }, [rightPanelOpen, toggleRightPanel]);
 
-  const orderer = mockOrderers.find((o) => o.id === id);
+  const orderer = orderers.find((o) => o.id === id);
 
   // この発注者の案件をAPIから取得
   const [ordererAnnouncements, setOrdererAnnouncements] = useState<any[]>([]);

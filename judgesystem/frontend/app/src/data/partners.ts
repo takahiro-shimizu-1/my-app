@@ -1,26 +1,15 @@
 /**
- * 協力会社マスターデータ（企業情報を統合）
- * 全ての会社データの単一真実源（Single Source of Truth）
+ * Partner data module.
+ *
+ * Re-exports the fetch function from the API layer and provides
+ * the static category list.
+ *
+ * Callers should use the usePartners hook or call fetchPartnerList
+ * directly instead of importing a pre-fetched array.
  */
-import type { PartnerListItem } from '../types';
-import { getApiUrl } from '../config/api';
+export { fetchPartnerList } from './api/partnerApi';
 
-
-const generatePartners = async (): Promise<PartnerListItem[]> => {
-  try {
-    const res = await fetch(getApiUrl('/api/partners'));
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : (data.data ?? []);
-  } catch {
-    return [];
-  }
-}
-
-// API から取得した実データをキャッシュとして保持
-export const partners: PartnerListItem[] = await generatePartners();
-
-// 種別（100種類以上）- エクスポート
+/** All construction / consulting category labels. */
 export const allCategories = [
   '土木一式', '建築一式', '大工', '左官', 'とび・土工', '石',
   '屋根', '電気', '管', 'タイル・れんが・ブロック', '鋼構造物',
@@ -43,10 +32,3 @@ export const allCategories = [
   '積算', '原価管理', '工程管理', '品質管理', '安全管理', '環境管理',
   'ISO9001', 'ISO14001', 'ISO45001', 'COHSMS', 'エコアクション21',
 ];
-
-// ヘルパー関数
-export const findPartnerById = (id: string): PartnerListItem | undefined =>
-  partners.find(p => p.id === id);
-
-export const findPartnerByName = (name: string): PartnerListItem | undefined =>
-  partners.find(p => p.name === name);
