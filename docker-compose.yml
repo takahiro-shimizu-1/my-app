@@ -97,6 +97,25 @@ services:
     command: >
       bash -c "npm install && npx vite --host 0.0.0.0 --port 5173"
 
+  judgesystem-collector:
+    build:
+      context: ./judgesystem/collector
+      dockerfile: Dockerfile
+    depends_on:
+      judgesystem-db:
+        condition: service_healthy
+    environment:
+      PGHOST: judgesystem-db
+      PGPORT: "5432"
+      PGDATABASE: judgesystem
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    ports:
+      - "8083:8000"
+    volumes:
+      - collector-output:/app/output
+
 volumes:
   my-app-node-modules:
   next-cache:
@@ -104,3 +123,4 @@ volumes:
   judgesystem-db-data:
   judgesystem-backend-node-modules:
   judgesystem-frontend-node-modules:
+  collector-output:
