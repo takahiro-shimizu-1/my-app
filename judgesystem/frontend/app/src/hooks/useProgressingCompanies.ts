@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { getApiUrl } from '../config/api';
+import { fetchWithTimeout, isAbortError } from '../utils/fetch';
 import type { ProgressingCompany } from '../components/announcement';
 import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 
@@ -80,12 +81,11 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
     if (!announcementNo) { setCompanies([]); return; }
     let isCancelled = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const fetchProgressingCompanies = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           getApiUrl(`/api/announcements/${announcementNo}/progressing-companies`),
           { signal: controller.signal },
         );
@@ -108,7 +108,7 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
         );
       } catch (err) {
         if (!isCancelled) {
-          if (err instanceof DOMException && err.name === 'AbortError') {
+          if (isAbortError(err)) {
             setError('リクエストがタイムアウトしました');
           } else {
             setError(err instanceof Error ? err.message : String(err));
@@ -116,12 +116,11 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
           setCompanies([]);
         }
       } finally {
-        clearTimeout(timeoutId);
         if (!isCancelled) setIsLoading(false);
       }
     };
     fetchProgressingCompanies();
-    return () => { isCancelled = true; clearTimeout(timeoutId); controller.abort(); };
+    return () => { isCancelled = true; controller.abort(); };
   }, [announcementNo]);
 
   // Search handler

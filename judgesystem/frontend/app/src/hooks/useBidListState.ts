@@ -7,6 +7,7 @@ import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x
 import { extractPrefecture } from '../constants/prefectures';
 import type { EvaluationStatus, FilterState } from '../types';
 import { getApiUrl } from '../config/api';
+import { loadFromStorage, saveToStorage } from '../utils/storage';
 
 // ナビゲーション追跡用のsessionStorageキー
 const NAV_TRACKING_KEY = 'lastVisitedPath';
@@ -38,30 +39,6 @@ const DEFAULT_STATUS_COUNTS: Record<EvaluationStatus, number> = {
   other_only_unmet: 0,
   unmet: 0,
 };
-
-/**
- * localStorage から安全に値を読み込む
- */
-function loadFromStorage<T>(key: string, defaultValue: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-  } catch {
-    /* ignore */
-  }
-  return defaultValue;
-}
-
-/**
- * localStorage に値を保存
- */
-function saveToStorage(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore */
-  }
-}
 
 /**
  * 詳細ページから戻ってきたかどうかを判定

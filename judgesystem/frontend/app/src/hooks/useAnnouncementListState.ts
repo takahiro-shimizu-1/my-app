@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x-data-grid';
 import type { AnnouncementFilterState } from '../components/announcement';
 import { getApiUrl } from '../config/api';
+import { loadFromStorage, saveToStorage } from '../utils/storage';
 
 // ローカルストレージのキー
 const STORAGE_KEYS = {
@@ -26,30 +27,6 @@ const DEFAULT_FILTERS: AnnouncementFilterState = {
 
 const DEFAULT_SORT: GridSortModel = [];
 const DEFAULT_PAGINATION: GridPaginationModel = { pageSize: 25, page: 0 };
-
-/**
- * localStorage から安全に値を読み込む
- */
-function loadFromStorage<T>(key: string, defaultValue: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-  } catch {
-    /* ignore */
-  }
-  return defaultValue;
-}
-
-/**
- * localStorage に値を保存
- */
-function saveToStorage(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore */
-  }
-}
 
 /**
  * API からデータを取得
