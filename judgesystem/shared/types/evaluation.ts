@@ -28,6 +28,9 @@ export const VALID_CURRENT_STEPS: ReadonlySet<string> = new Set([
   "final_review",
 ]);
 
+/** Company priority ranking (1 = highest, 5 = lowest). */
+export type CompanyPriority = 1 | 2 | 3 | 4 | 5;
+
 // -- Concrete response types --
 
 export interface EvaluationListItem {

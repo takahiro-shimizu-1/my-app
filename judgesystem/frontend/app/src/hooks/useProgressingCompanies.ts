@@ -17,6 +17,18 @@ export interface CompanyFilterState {
   priorities: (1 | 2 | 3 | 4 | 5)[];
 }
 
+/** Raw row shape from the progressing-companies API response. */
+interface ProgressingCompanyApiRow {
+  companyId?: string | number;
+  companyName?: string;
+  branchId?: string | number;
+  branchName?: string;
+  priority?: number;
+  workStatus?: string;
+  evaluationId?: string | number;
+  evaluationStatus?: string;
+}
+
 // -- Constants --
 
 const EVALUATION_STATUS_ORDER: Record<EvaluationStatus, number> = {
@@ -82,7 +94,7 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
         if (isCancelled) return;
         setCompanies(
           Array.isArray(data)
-            ? data.map((row: any) => ({
+            ? data.map((row: ProgressingCompanyApiRow) => ({
                 companyId: String(row.companyId ?? ''),
                 companyName: row.companyName ?? '',
                 branchId: String(row.branchId ?? ''),

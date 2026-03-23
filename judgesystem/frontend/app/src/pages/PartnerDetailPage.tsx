@@ -31,7 +31,7 @@ import { NotFoundView, FloatingBackButton, ScrollToTopButton, FilterButton } fro
 import { RightSidePanel } from '../components/layout';
 import { PartnerBasicInfo, PartnerQualifications, PartnerHistory } from '../components/partner';
 import { useSidebar } from '../contexts/SidebarContext';
-import type { PastProject } from '../types/partner';
+import type { PastProject, PartnerDetail } from '../types/partner';
 import type { BidType } from '../types/announcement';
 import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 import { getApiUrl } from '../config/api';
@@ -815,7 +815,7 @@ export default function PartnerDetailPage() {
   const [conditionTab, setConditionTab] = useState<'sort' | 'filter'>('sort');
 
   // APIからデータ取得
-  const [partner, setPartner] = useState<any>(null);
+  const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

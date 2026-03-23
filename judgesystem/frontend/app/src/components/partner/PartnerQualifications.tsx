@@ -1,9 +1,10 @@
 import { Box, Typography, Rating, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import { colors, fontSizes, borderRadius } from '../../constants/styles';
+import type { PartnerDetail, UnifiedQualification, OrdererQualification, OrdererQualificationItem } from '../../types/partner';
 
 interface PartnerQualificationsProps {
-  partner: any;
+  partner: PartnerDetail;
 }
 
 export function PartnerQualifications({ partner }: PartnerQualificationsProps) {
@@ -59,7 +60,7 @@ export function PartnerQualifications({ partner }: PartnerQualificationsProps) {
                 <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.xs, fontWeight: 600, color: colors.text.muted, textAlign: 'center' }}>等級</Typography>
               </Box>
               {/* テーブルボディ */}
-              {partner.qualifications.unified.map((q: any, idx: number) => (
+              {partner.qualifications.unified.map((q: UnifiedQualification, idx: number) => (
                 <Box key={idx} sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 80px 70px', borderBottom: idx < partner.qualifications.unified.length - 1 ? `1px solid ${colors.border.light}` : 'none', '&:hover': { backgroundColor: 'rgba(0,0,0,0.02)' } }}>
                   <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.sm, color: colors.text.secondary }}>{q.mainCategory}</Typography>
                   <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.sm, color: colors.text.secondary }}>{q.category}</Typography>
@@ -77,7 +78,7 @@ export function PartnerQualifications({ partner }: PartnerQualificationsProps) {
             <Typography sx={{ color: colors.text.light, fontSize: fontSizes.sm }}>登録なし</Typography>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {partner.qualifications.orderers.map((orderer: any, idx: number) => (
+              {partner.qualifications.orderers.map((orderer: OrdererQualification, idx: number) => (
                 <Box key={idx}>
                   <Typography sx={{ fontSize: fontSizes.sm, fontWeight: 600, color: colors.text.secondary, mb: 1, pl: 1.5, borderLeft: `3px solid ${colors.accent.blue}` }}>{orderer.ordererName}</Typography>
                   <Box sx={{ border: `1px solid ${colors.border.main}`, borderRadius: borderRadius.xs, overflow: 'hidden' }}>
@@ -89,7 +90,7 @@ export function PartnerQualifications({ partner }: PartnerQualificationsProps) {
                       <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.xs, fontWeight: 600, color: colors.text.muted, textAlign: 'center' }}>等級</Typography>
                     </Box>
                     {/* テーブルボディ */}
-                    {orderer.items.map((item: any, itemIdx: number) => (
+                    {orderer.items.map((item: OrdererQualificationItem, itemIdx: number) => (
                       <Box key={itemIdx} sx={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 70px', borderBottom: itemIdx < orderer.items.length - 1 ? `1px solid ${colors.border.light}` : 'none', '&:hover': { backgroundColor: 'rgba(0,0,0,0.02)' } }}>
                         <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.sm, color: colors.text.secondary }}>{item.category}</Typography>
                         <Typography sx={{ px: 1.5, py: 1, fontSize: fontSizes.sm, color: colors.text.muted }}>{item.region}</Typography>

@@ -2,6 +2,7 @@ export type {
   EvaluationStatus,
   WorkStatus,
   CurrentStep,
+  CompanyPriority,
   EvaluationListItem,
   StatusCounts,
   AssigneeRecord,

@@ -12,6 +12,7 @@ import {
   ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { colors, fontSizes, chipStyles, iconStyles, borderRadius } from '../../constants/styles';
+import type { PartnerDetail, PartnerBranch } from '../../types/partner';
 
 function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
   return (
@@ -24,7 +25,7 @@ function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode
 }
 
 interface PartnerBasicInfoProps {
-  partner: any;
+  partner: PartnerDetail;
 }
 
 export function PartnerBasicInfo({ partner }: PartnerBasicInfoProps) {
@@ -61,7 +62,7 @@ export function PartnerBasicInfo({ partner }: PartnerBasicInfoProps) {
           <Typography sx={{ fontSize: fontSizes.base, fontWeight: 600, color: colors.primary.main }}>拠点一覧 ({partner.branches.length})</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ pt: 2, pb: 2, px: 2.5 }}>
-          {partner.branches.map((branch: any, index: number) => (
+          {partner.branches.map((branch: PartnerBranch, index: number) => (
             <Box key={index} sx={{ py: 1.25, borderBottom: index < partner.branches.length - 1 ? `1px solid ${colors.border.light}` : 'none' }}>
               <Typography sx={{ fontWeight: 600, fontSize: fontSizes.md, color: colors.text.secondary }}>{branch.name}</Typography>
               <Typography sx={{ fontSize: fontSizes.md, color: colors.text.muted }}>{branch.address}</Typography>
