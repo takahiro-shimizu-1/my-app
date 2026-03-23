@@ -14,6 +14,7 @@ import {
 } from "./src/routes";
 import { errorHandler } from "./src/middleware/errorHandler";
 import { authMiddleware } from "./src/middleware/auth";
+import { logger } from "./src/utils/logger";
 
 const app = express();
 
@@ -36,13 +37,12 @@ app.use((req, res, next) => {
   if (req.path === "/health") return next();
   const start = Date.now();
   res.on("finish", () => {
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    logger.info("request", {
       method: req.method,
       path: req.path,
       status: res.statusCode,
-      duration: Date.now() - start
-    }));
+      duration: Date.now() - start,
+    });
   });
   next();
 });
@@ -86,16 +86,16 @@ const port = env.PORT;
   try {
     await runMigrations();
   } catch (err) {
-    console.error("Migration failed, starting server anyway:", err);
+    logger.error("Migration failed, starting server anyway", { error: String(err) });
   }
 
   const server = app.listen(port, () => {
-    console.log(`API server running on port ${port}`);
+    logger.info("API server running", { port });
   });
 
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
     process.on(signal, () => {
-      console.log(`Received ${signal}, shutting down gracefully...`);
+      logger.info("Shutting down gracefully", { signal });
       server.close(() => {
         pool.end().then(() => process.exit(0));
       });
