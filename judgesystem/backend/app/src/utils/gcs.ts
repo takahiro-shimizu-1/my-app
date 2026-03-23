@@ -36,7 +36,10 @@ export async function readMarkdownFromGCS(gcsPath: string): Promise<string> {
     return content.toString('utf-8');
   } catch (error) {
     console.error(`Failed to read from GCS: ${gcsPath}`, error);
-    throw new Error(`Failed to read markdown from GCS: ${gcsPath}`);
+    throw new Error(
+      `Failed to read markdown from GCS: ${gcsPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
 }
 
@@ -50,7 +53,10 @@ export async function downloadFileFromGCS(gcsPath: string): Promise<Buffer> {
     return content;
   } catch (error) {
     console.error(`Failed to download file from GCS: ${gcsPath}`, error);
-    throw new Error(`Failed to download file from GCS: ${gcsPath}`);
+    throw new Error(
+      `Failed to download file from GCS: ${gcsPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
 }
 
