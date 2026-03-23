@@ -1,22 +1,18 @@
 import { Pool, PoolConfig } from "pg";
-
-const shouldEnableSsl = (): boolean => {
-  const flag = (process.env.PGSSLMODE ?? process.env.PGSSL ?? "").toLowerCase();
-  return flag === "require" || flag === "true";
-};
+import { env } from "./env";
 
 const buildPoolConfig = (): PoolConfig => {
-  const config: PoolConfig = process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL }
+  const config: PoolConfig = env.DATABASE_URL
+    ? { connectionString: env.DATABASE_URL }
     : {
-        host: process.env.PGHOST ?? "127.0.0.1",
-        port: Number(process.env.PGPORT ?? "5432"),
-        database: process.env.PGDATABASE ?? "postgres",
-        user: process.env.PGUSER ?? "postgres",
-        password: process.env.PGPASSWORD,
+        host: env.PGHOST,
+        port: env.PGPORT,
+        database: env.PGDATABASE,
+        user: env.PGUSER,
+        password: env.PGPASSWORD,
       };
 
-  if (shouldEnableSsl()) {
+  if (env.PGSSLMODE === "require" || env.PGSSLMODE === "true") {
     config.ssl = {
       rejectUnauthorized:
         (process.env.PGSSL_REJECT_UNAUTHORIZED ?? "false").toLowerCase() === "true",
@@ -44,4 +40,4 @@ export const TABLES = {
   officeMaster: "office_master",
 } as const;
 
-export const schemaPrefix = process.env.PG_SCHEMA ? `${process.env.PG_SCHEMA}.` : "";
+export const schemaPrefix = env.PG_SCHEMA ? `${env.PG_SCHEMA}.` : "";

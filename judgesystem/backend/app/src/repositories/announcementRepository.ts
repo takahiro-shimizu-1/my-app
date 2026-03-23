@@ -311,32 +311,6 @@ export class AnnouncementRepository {
   }
 
   /**
-   * Get document file for preview/download.
-   * Fetches metadata from DB, then downloads actual file from GCS.
-   */
-  async getDocumentFile(
-    announcementNo: number,
-    documentId: string
-  ): Promise<{ data: Buffer; fileFormat: string; title: string } | null> {
-    const meta = await this.findDocumentMeta(announcementNo, documentId);
-    if (!meta) return null;
-
-    const gcsPath = meta.save_path;
-    if (!gcsPath || !gcsPath.startsWith("gs://")) {
-      return null;
-    }
-
-    const { downloadFileFromGCS } = await import("../utils/gcs");
-    const data = await downloadFileFromGCS(gcsPath);
-
-    return {
-      data,
-      fileFormat: meta.fileFormat || "pdf",
-      title: meta.title || `document-${documentId}`,
-    };
-  }
-
-  /**
    * Find related announcements by same category/organization/location.
    */
   async findRelated(announcementNo: number): Promise<any[]> {

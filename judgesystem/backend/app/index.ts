@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import compression from "compression";
+import { env } from "./src/config/env";
 import { pool } from "./src/config/database";
 import { runMigrations } from "./src/config/migrations";
 import {
@@ -11,13 +12,14 @@ import {
   contactRoutes,
   companyRoutes,
 } from "./src/routes";
+import { errorHandler } from "./src/middleware/errorHandler";
 
 const app = express();
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  origin: env.CORS_ORIGIN,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["*"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: false
 }));
 
@@ -70,8 +72,11 @@ app.use("/api/orderers", ordererRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/companies", companyRoutes);
 
+// Error handler (must be after all routes)
+app.use(errorHandler);
+
 // Start server
-const port = process.env.PORT || 8080;
+const port = env.PORT;
 
 (async () => {
   try {

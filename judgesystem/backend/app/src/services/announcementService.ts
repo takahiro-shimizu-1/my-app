@@ -149,14 +149,24 @@ export class AnnouncementService {
 
   /**
    * Get a document file for preview/download.
-   * Delegates file lookup to repository (DB query for metadata),
-   * then downloads the actual file via documentService.
+   * Fetches metadata from repository (DB), then downloads via documentService (GCS).
    */
   async getDocumentPreview(
     announcementNo: number,
     documentId: string
   ): Promise<{ data: Buffer; fileFormat: string; title: string } | null> {
-    return this.repository.getDocumentFile(announcementNo, documentId);
+    const meta = await this.repository.findDocumentMeta(announcementNo, documentId);
+    if (!meta) return null;
+
+    const gcsPath = meta.save_path;
+    if (!gcsPath || !gcsPath.startsWith("gs://")) return null;
+
+    const data = await this.documentService.downloadDocument(gcsPath);
+    return {
+      data,
+      fileFormat: meta.fileFormat || "pdf",
+      title: meta.title || `document-${documentId}`,
+    };
   }
 
   /**
