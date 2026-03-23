@@ -278,6 +278,8 @@ function RelatedConditionsPanel({
                 <Box key={region.region} sx={{ mb: 2 }}>
                   <button
                     onClick={() => togglePrefRegion(region.prefectures)}
+                    aria-label={`${region.region}の都道府県を一括選択`}
+                    aria-pressed={selectionState === 'all'}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -350,6 +352,8 @@ function RelatedConditionsPanel({
                 <Box key={region.region} sx={{ mb: 2 }}>
                   <button
                     onClick={() => toggleOrgRegion(region.items)}
+                    aria-label={`${region.region}の発注機関を一括選択`}
+                    aria-pressed={selectionState === 'all'}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -455,6 +459,7 @@ function RelatedConditionsPanel({
           onChange={onSearchChange}
           size="small"
           fullWidth
+          aria-label="関連案件を検索"
           sx={{
             '& .MuiOutlinedInput-root': {
               fontSize: fontSizes.sm,
@@ -478,6 +483,7 @@ function RelatedConditionsPanel({
                   size="small"
                   onClick={() => onSearchChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>)}
                   sx={{ color: rightPanelColors.textMuted }}
+                  aria-label="検索をクリア"
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
@@ -488,9 +494,12 @@ function RelatedConditionsPanel({
       </Box>
 
       {/* ソート/フィルター タブ */}
-      <Box>
+      <Box role="tablist" aria-label="関連案件の表示条件">
         <Box sx={{ display: 'flex', borderBottom: `1px solid ${rightPanelColors.border}`, mb: 2 }}>
           <Box
+            role="tab"
+            aria-selected={mainTab === 'sort'}
+            aria-label="ソート"
             onClick={() => setMainTab('sort')}
             sx={{
               flex: 1,
@@ -510,6 +519,9 @@ function RelatedConditionsPanel({
             ソート
           </Box>
           <Box
+            role="tab"
+            aria-selected={mainTab === 'filter'}
+            aria-label="フィルター"
             onClick={() => setMainTab('filter')}
             sx={{
               flex: 1,
@@ -564,6 +576,8 @@ function RelatedConditionsPanel({
                 <Box
                   component="button"
                   key={field}
+                  aria-label={`ソート: ${label}`}
+                  aria-pressed={isActive}
                   onClick={() => {
                     if (!isActive) {
                       onSortChange(ascOption);
@@ -632,6 +646,8 @@ function RelatedConditionsPanel({
                   <Box
                     component="button"
                     key={tab.id}
+                    aria-label={`フィルター: ${tab.label}`}
+                    aria-pressed={isActive}
                     onClick={() => setActiveFilterTab(index)}
                     sx={{
                       display: 'flex',
@@ -876,6 +892,7 @@ function CompanyConditionsPanel({
           onChange={onSearchChange}
           size="small"
           fullWidth
+          aria-label="企業名で検索"
           sx={{
             '& .MuiOutlinedInput-root': {
               fontSize: fontSizes.sm,
@@ -899,6 +916,7 @@ function CompanyConditionsPanel({
                   size="small"
                   onClick={() => onSearchChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>)}
                   sx={{ color: rightPanelColors.textMuted }}
+                  aria-label="検索をクリア"
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
@@ -909,9 +927,12 @@ function CompanyConditionsPanel({
       </Box>
 
       {/* ソート/フィルター タブ */}
-      <Box>
+      <Box role="tablist" aria-label="着手企業の表示条件">
         <Box sx={{ display: 'flex', borderBottom: `1px solid ${rightPanelColors.border}`, mb: 2 }}>
           <Box
+            role="tab"
+            aria-selected={mainTab === 'sort'}
+            aria-label="ソート"
             onClick={() => setMainTab('sort')}
             sx={{
               flex: 1,
@@ -931,6 +952,9 @@ function CompanyConditionsPanel({
             ソート
           </Box>
           <Box
+            role="tab"
+            aria-selected={mainTab === 'filter'}
+            aria-label="フィルター"
             onClick={() => setMainTab('filter')}
             sx={{
               flex: 1,
@@ -985,6 +1009,8 @@ function CompanyConditionsPanel({
                 <Box
                   component="button"
                   key={field}
+                  aria-label={`ソート: ${label}`}
+                  aria-pressed={isActive}
                   onClick={() => {
                     if (!isActive) {
                       onSortChange(ascOption);
@@ -1053,6 +1079,8 @@ function CompanyConditionsPanel({
                   <Box
                     component="button"
                     key={tab.id}
+                    aria-label={`フィルター: ${tab.label}`}
+                    aria-pressed={isActive}
                     onClick={() => setActiveFilterTab(index)}
                     sx={{
                       display: 'flex',
