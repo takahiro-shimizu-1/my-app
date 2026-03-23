@@ -486,6 +486,50 @@ export class EvaluationRepository {
     return '';
   }
 
+  /**
+   * Find assignees for a given evaluation
+   */
+  async findAssignees(evaluationNo: string): Promise<any[]> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT step_id AS "stepId", contact_id::text AS "staffId", assigned_at AS "assignedAt"
+         FROM ${schemaPrefix}${TABLES.evaluationAssignees}
+         WHERE evaluation_no::text = $1
+         ORDER BY step_id`,
+        [evaluationNo]
+      );
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Upsert an assignee for an evaluation step
+   */
+  async updateAssignee(
+    evaluationNo: string,
+    body: { stepId: string; staffId: string }
+  ): Promise<any | null> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `INSERT INTO ${schemaPrefix}${TABLES.evaluationAssignees}
+           (evaluation_no, step_id, contact_id, assigned_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (evaluation_no, step_id) DO UPDATE
+         SET contact_id = EXCLUDED.contact_id, assigned_at = NOW()
+         RETURNING evaluation_no AS "evaluationNo", step_id AS "stepId",
+                   contact_id::text AS "staffId", assigned_at AS "assignedAt"`,
+        [evaluationNo, body.stepId, body.staffId]
+      );
+      return result.rowCount === 0 ? null : result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
   private getQualifiedTables(): QualifiedTables {
     return {
       companyBidJudgement: `${schemaPrefix}company_bid_judgement`,

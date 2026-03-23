@@ -1,10 +1,7 @@
 import { AnnouncementRepository } from "../repositories/announcementRepository";
 import { DocumentService } from "./documentService";
-import { FilterParams } from "../types";
-
-// -- Status determination (single implementation, no duplication with SQL) --
-
-type AnnouncementStatus = "upcoming" | "ongoing" | "awaiting_result" | "closed";
+import type { FilterParams, AnnouncementStatus } from "../../../../shared/types";
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from "../../../../shared/constants";
 
 /**
  * Determine announcement status from the bid end date.
@@ -99,8 +96,8 @@ export class AnnouncementService {
   async getList(
     filters: FilterParams
   ): Promise<{ data: any[]; total: number; page: number; pageSize: number }> {
-    const page = filters.page ?? 0;
-    const pageSize = filters.pageSize ?? 25;
+    const page = filters.page ?? DEFAULT_PAGE;
+    const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
 
     const result = await this.repository.findWithFilters({
       ...filters,
@@ -160,6 +157,13 @@ export class AnnouncementService {
     documentId: string
   ): Promise<{ data: Buffer; fileFormat: string; title: string } | null> {
     return this.repository.getDocumentFile(announcementNo, documentId);
+  }
+
+  /**
+   * Get related announcements sharing category/organization/location.
+   */
+  async getRelated(announcementNo: number): Promise<any[]> {
+    return this.repository.findRelated(announcementNo);
   }
 
   /**

@@ -1,23 +1,9 @@
 import { EvaluationRepository } from "../repositories/evaluationRepository";
 import { DocumentService } from "./documentService";
-import { FilterParams } from "../types";
-
-// -- Status determination types --
-
-type EvaluationStatus = "all_met" | "other_only_unmet" | "unmet";
-
-type WorkStatus =
-  | "not_started"
-  | "in_progress"
-  | "completed"
-  | "on_hold"
-  | "cancelled";
-
-type CurrentStep =
-  | "judgment"
-  | "document_review"
-  | "field_survey"
-  | "final_review";
+import type { FilterParams } from "../../../../shared/types";
+import type { EvaluationStatus, WorkStatus, CurrentStep } from "../../../../shared/types";
+import { VALID_WORK_STATUSES, VALID_CURRENT_STEPS } from "../../../../shared/types";
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from "../../../../shared/constants";
 
 // -- Raw row shape from repository (the boolean flags come from SQL) --
 
@@ -85,22 +71,7 @@ export function defaultPriority(raw: number | null | undefined): number {
 
 // -- Validation --
 
-const VALID_WORK_STATUSES: ReadonlySet<string> = new Set([
-  "not_started",
-  "in_progress",
-  "completed",
-  "on_hold",
-  "cancelled",
-]);
-
-const VALID_CURRENT_STEPS: ReadonlySet<string> = new Set([
-  "judgment",
-  "document_review",
-  "field_survey",
-  "final_review",
-]);
-
-function validateWorkStatus(value: string): void {
+export function validateWorkStatus(value: string): void {
   if (!VALID_WORK_STATUSES.has(value)) {
     throw new Error(
       `Invalid workStatus: "${value}". Must be one of: ${[...VALID_WORK_STATUSES].join(", ")}`
@@ -108,7 +79,7 @@ function validateWorkStatus(value: string): void {
   }
 }
 
-function validateCurrentStep(value: string): void {
+export function validateCurrentStep(value: string): void {
   if (!VALID_CURRENT_STEPS.has(value)) {
     throw new Error(
       `Invalid currentStep: "${value}". Must be one of: ${[...VALID_CURRENT_STEPS].join(", ")}`
@@ -142,8 +113,8 @@ export class EvaluationService {
   async getList(
     filters: FilterParams
   ): Promise<{ data: any[]; total: number; page: number; pageSize: number }> {
-    const page = filters.page ?? 0;
-    const pageSize = filters.pageSize ?? 25;
+    const page = filters.page ?? DEFAULT_PAGE;
+    const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
 
     const result = await this.repository.findWithFilters({
       ...filters,
@@ -217,31 +188,29 @@ export class EvaluationService {
   async getStatusCounts(
     filters: FilterParams
   ): Promise<{ all_met: number; other_only_unmet: number; unmet: number }> {
-    return this.repository.getStatusCounts(filters);
+    const rows = await this.repository.getStatusCountsRaw(filters);
+    const counts = { all_met: 0, other_only_unmet: 0, unmet: 0 };
+    for (const row of rows) {
+      const status = determineEvaluationStatus(row);
+      counts[status]++;
+    }
+    return counts;
   }
 
   /**
    * Get assignees for an evaluation.
-   * Delegates to repository if the method exists.
    */
   async getAssignees(evaluationNo: string): Promise<any[]> {
-    if (typeof (this.repository as any).findAssignees === "function") {
-      return (this.repository as any).findAssignees(evaluationNo);
-    }
-    return [];
+    return this.repository.findAssignees(evaluationNo);
   }
 
   /**
    * Update assignee for an evaluation.
-   * Delegates to repository if the method exists.
    */
   async updateAssignee(
     evaluationNo: string,
-    body: any
+    body: { stepId: string; staffId: string }
   ): Promise<any | null> {
-    if (typeof (this.repository as any).updateAssignee === "function") {
-      return (this.repository as any).updateAssignee(evaluationNo, body);
-    }
-    return null;
+    return this.repository.updateAssignee(evaluationNo, body);
   }
 }

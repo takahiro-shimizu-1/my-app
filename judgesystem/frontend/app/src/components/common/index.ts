@@ -1,5 +1,6 @@
 export { ErrorBoundary } from './ErrorBoundary';
-export { FilterOptionButton } from './FilterOptionButton';
+export { FilterButton } from './FilterButton';
+export type { FilterButtonProps } from './FilterButton';
 export { SelectAllButton } from './SelectAllButton';
 export { CollapsibleSection } from './CollapsibleSection';
 export { CollapsiblePanel } from './CollapsiblePanel';

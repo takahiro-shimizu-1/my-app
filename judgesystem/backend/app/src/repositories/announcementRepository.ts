@@ -311,6 +311,74 @@ export class AnnouncementRepository {
   }
 
   /**
+   * Get document file for preview/download.
+   * Fetches metadata from DB, then downloads actual file from GCS.
+   */
+  async getDocumentFile(
+    announcementNo: number,
+    documentId: string
+  ): Promise<{ data: Buffer; fileFormat: string; title: string } | null> {
+    const meta = await this.findDocumentMeta(announcementNo, documentId);
+    if (!meta) return null;
+
+    const gcsPath = meta.save_path;
+    if (!gcsPath || !gcsPath.startsWith("gs://")) {
+      return null;
+    }
+
+    const { downloadFileFromGCS } = await import("../utils/gcs");
+    const data = await downloadFileFromGCS(gcsPath);
+
+    return {
+      data,
+      fileFormat: meta.fileFormat || "pdf",
+      title: meta.title || `document-${documentId}`,
+    };
+  }
+
+  /**
+   * Find related announcements by same category/organization/location.
+   */
+  async findRelated(announcementNo: number): Promise<any[]> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `
+        WITH target AS (
+          SELECT category, "topAgencyName", "workPlace"
+          FROM ${schemaPrefix}bid_announcements
+          WHERE announcement_no = $1
+        )
+        SELECT
+          CONCAT('ann-', a.announcement_no) AS id,
+          a.announcement_no AS no,
+          a.announcement_no AS "announcementNo",
+          COALESCE(a."workName", '') AS title,
+          COALESCE(a."topAgencyName", '') AS organization,
+          COALESCE(a.category, '') AS category,
+          COALESCE(a."bidType", 'unknown') AS "bidType",
+          COALESCE(a."workPlace", '') AS "workLocation",
+          COALESCE(a."publishDate", '') AS "publishDate",
+          COALESCE(a."bidEndDate", '') AS deadline
+        FROM ${schemaPrefix}bid_announcements a, target t
+        WHERE a.announcement_no != $1
+          AND (
+            a.category = t.category
+            OR a."topAgencyName" = t."topAgencyName"
+            OR a."workPlace" = t."workPlace"
+          )
+        ORDER BY a."bidEndDate" DESC NULLS LAST
+        LIMIT 50
+        `,
+        [announcementNo]
+      );
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Build WHERE clause from filters (pure data column filters only)
    * bid_announcements テーブルのカラム名に対応
    */
