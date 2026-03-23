@@ -1,12 +1,13 @@
 import { pool, TABLES, schemaPrefix } from "../config/database";
 import { FilterParams } from "../types";
+import type { AnnouncementListItem } from "../../../../shared/types";
 
 export class AnnouncementRepository {
   /**
    * Get paginated announcements list with filters
    * bid_announcements テーブルから一覧表示に必要な最小限のデータを取得
    */
-  async findWithFilters(filters: FilterParams): Promise<{ data: any[]; total: number }> {
+  async findWithFilters(filters: FilterParams): Promise<{ data: AnnouncementListItem[]; total: number }> {
     const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
 
     const page = filters.page || 0;
@@ -51,7 +52,7 @@ export class AnnouncementRepository {
    * Find single announcement by announcement_no
    * bid_announcements をベースに、documents と competing_companies を取得
    */
-  async findByNo(announcementNo: number): Promise<any | null> {
+  async findByNo(announcementNo: number): Promise<Record<string, unknown> | null> {
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -163,7 +164,7 @@ export class AnnouncementRepository {
   /**
    * Get progressing companies (raw data - Service computes statuses)
    */
-  async findProgressingCompanies(announcementNo: number): Promise<any[]> {
+  async findProgressingCompanies(announcementNo: number): Promise<Record<string, unknown>[]> {
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -208,7 +209,7 @@ export class AnnouncementRepository {
   /**
    * Get similar cases for a specific announcement (by announcement_no)
    */
-  async findSimilarCases(announcementNo: number): Promise<any[]> {
+  async findSimilarCases(announcementNo: number): Promise<Record<string, unknown>[]> {
     const client = await pool.connect();
     try {
       const announcementIdCandidates = [`ann-${announcementNo}`, String(announcementNo)];
@@ -272,7 +273,7 @@ export class AnnouncementRepository {
   /**
    * Get document metadata for a specific document (data only, no GCS)
    */
-  async findDocumentMeta(announcementNo: number, documentId: string): Promise<any | null> {
+  async findDocumentMeta(announcementNo: number, documentId: string): Promise<Record<string, unknown> | null> {
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -303,7 +304,7 @@ export class AnnouncementRepository {
   /**
    * Find related announcements by same category/organization/location.
    */
-  async findRelated(announcementNo: number): Promise<any[]> {
+  async findRelated(announcementNo: number): Promise<Record<string, unknown>[]> {
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -348,11 +349,11 @@ export class AnnouncementRepository {
    */
   private buildWhereClause(filters: FilterParams): {
     whereClause: string;
-    queryParams: any[];
+    queryParams: unknown[];
     paramIndex: number;
   } {
     const whereClauses: string[] = [];
-    const queryParams: any[] = [];
+    const queryParams: unknown[] = [];
     let paramIndex = 1;
 
     if (filters.bidTypes && filters.bidTypes.length > 0) {

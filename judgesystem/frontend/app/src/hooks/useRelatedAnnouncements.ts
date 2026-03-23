@@ -4,6 +4,23 @@ import { getOrganizationGroup } from '../constants/organizations';
 import { getApiUrl } from '../config/api';
 import type { AnnouncementStatus } from '../types/announcement';
 
+// -- Related announcement row returned by the API --
+
+/** A related announcement entry from the backend. */
+export interface RelatedAnnouncement {
+  id: string;
+  no: number;
+  announcementNo: number;
+  title: string;
+  organization: string;
+  category: string;
+  bidType: string;
+  workLocation: string;
+  publishDate: string;
+  deadline: string;
+  status?: string;
+}
+
 // -- Types --
 
 export type SortOption =
@@ -52,7 +69,7 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
   const pageSize = 25;
 
   // Base data fetched from API
-  const [baseRelatedAnnouncements, setBaseRelatedAnnouncements] = useState<any[]>([]);
+  const [baseRelatedAnnouncements, setBaseRelatedAnnouncements] = useState<RelatedAnnouncement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
