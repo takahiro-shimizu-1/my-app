@@ -5,8 +5,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x-data-grid';
 import { extractPrefecture } from '../constants/prefectures';
-import type { EvaluationStatus, FilterState } from '../types';
-import { getApiUrl } from '../config/api';
+import type { EvaluationStatus, FilterState, EvaluationApiItem, EvaluationListRow } from '../types';
+import { fetchEvaluations, fetchStatusCounts } from '../data/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 
 // ナビゲーション追跡用のsessionStorageキー
@@ -54,105 +54,6 @@ function isReturningFromDetail(): boolean {
 }
 
 /**
- * API からデータを取得
- */
-function appendFilterParams(
-  queryParams: URLSearchParams,
-  filters: FilterState,
-  options?: { includeStatuses?: boolean }
-) {
-  const includeStatuses = options?.includeStatuses ?? true;
-
-  if (includeStatuses && filters.statuses.length > 0) {
-    filters.statuses.forEach(s => queryParams.append('statuses', s));
-  }
-  if (filters.workStatuses.length > 0) {
-    filters.workStatuses.forEach(s => queryParams.append('workStatuses', s));
-  }
-  if (filters.priorities.length > 0) {
-    filters.priorities.forEach(s => queryParams.append('priorities', s.toString()));
-  }
-  if (filters.categories.length > 0) {
-    filters.categories.forEach(s => queryParams.append('categories', s));
-  }
-  if (filters.bidTypes.length > 0) {
-    filters.bidTypes.forEach(s => queryParams.append('bidTypes', s));
-  }
-  if (filters.organizations.length > 0) {
-    filters.organizations.forEach(s => queryParams.append('organizations', s));
-  }
-  if (filters.prefectures.length > 0) {
-    filters.prefectures.forEach(s => queryParams.append('prefectures', s));
-  }
-}
-
-async function fetchEvaluations(params: {
-  page: number;
-  pageSize: number;
-  filters: FilterState;
-  searchQuery: string;
-  sortModel: GridSortModel;
-}): Promise<{ data: any[]; total: number }> {
-  const { page, pageSize, filters, searchQuery, sortModel } = params;
-
-  // クエリパラメータを構築
-  const queryParams = new URLSearchParams();
-  queryParams.append('page', page.toString());
-  queryParams.append('pageSize', pageSize.toString());
-
-  // フィルター
-  appendFilterParams(queryParams, filters);
-
-  // 検索
-  if (searchQuery.trim()) {
-    queryParams.append('searchQuery', searchQuery.trim());
-  }
-
-  // ソート
-  if (sortModel.length > 0) {
-    const sort = sortModel[0];
-    queryParams.append('sortField', sort.field);
-    queryParams.append('sortOrder', sort.sort || 'asc');
-  }
-
-  const response = await fetch(getApiUrl(`/api/evaluations?${queryParams.toString()}`));
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API Error:', response.status, errorText);
-    throw new Error(`Failed to fetch evaluations: ${response.status} - ${errorText}`);
-  }
-
-  const result = await response.json();
-  console.log('API Response:', result);
-  return result;
-}
-
-async function fetchStatusCounts(params: {
-  filters: FilterState;
-  searchQuery: string;
-}): Promise<Record<EvaluationStatus, number>> {
-  const { filters, searchQuery } = params;
-  const queryParams = new URLSearchParams();
-  appendFilterParams(queryParams, filters, { includeStatuses: false });
-
-  if (searchQuery.trim()) {
-    queryParams.append('searchQuery', searchQuery.trim());
-  }
-
-  const response = await fetch(getApiUrl(`/api/evaluations/status-counts?${queryParams.toString()}`));
-  if (!response.ok) {
-    throw new Error(`Failed to fetch status counts: ${response.status}`);
-  }
-
-  const result = await response.json();
-  return {
-    all_met: Number(result?.all_met ?? 0),
-    other_only_unmet: Number(result?.other_only_unmet ?? 0),
-    unmet: Number(result?.unmet ?? 0),
-  };
-}
-
-/**
  * 入札一覧の状態管理フック
  */
 export function useBidListState() {
@@ -192,7 +93,7 @@ export function useBidListState() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // API状態
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<EvaluationListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,7 +176,7 @@ export function useBidListState() {
             throw new Error('Invalid API response: data is not an array');
           }
 
-          const mapped = result.data.map((e: any) => ({
+          const mapped = result.data.map((e: EvaluationApiItem): EvaluationListRow => ({
             id: e.id,
             evaluationNo: e.evaluationNo,
             status: e.status,

@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { resolveAnnouncementStatus } from '../components/announcement';
 import { getOrganizationGroup } from '../constants/organizations';
-import { getApiUrl } from '../config/api';
-import { fetchWithTimeout, isAbortError } from '../utils/fetch';
+import { fetchRelatedAnnouncements as fetchRelatedAnnouncementsApi } from '../data/api';
+import { isAbortError } from '../utils/fetch';
 import type { AnnouncementStatus } from '../types/announcement';
 
 // -- Related announcement row returned by the API --
@@ -78,17 +78,14 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
     if (!announcementNo) { setBaseRelatedAnnouncements([]); return; }
     let isCancelled = false;
     const controller = new AbortController();
-    const fetchRelated = async () => {
+    const loadRelated = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetchWithTimeout(
-          getApiUrl(`/api/announcements/${announcementNo}/related`),
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-        const data = await response.json();
-        if (!isCancelled) setBaseRelatedAnnouncements(Array.isArray(data) ? data : []);
+        const data = await fetchRelatedAnnouncementsApi(announcementNo, {
+          signal: controller.signal,
+        });
+        if (!isCancelled) setBaseRelatedAnnouncements(data as RelatedAnnouncement[]);
       } catch (err) {
         if (!isCancelled) {
           if (isAbortError(err)) {
@@ -102,7 +99,7 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
         if (!isCancelled) setIsLoading(false);
       }
     };
-    fetchRelated();
+    loadRelated();
     return () => { isCancelled = true; controller.abort(); };
   }, [announcementNo]);
 

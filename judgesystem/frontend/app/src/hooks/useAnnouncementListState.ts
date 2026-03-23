@@ -4,7 +4,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x-data-grid';
 import type { AnnouncementFilterState } from '../components/announcement';
-import { getApiUrl } from '../config/api';
+import type { AnnouncementListRow } from '../types';
+import { fetchAnnouncements } from '../data/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 
 // ローカルストレージのキー
@@ -27,64 +28,6 @@ const DEFAULT_FILTERS: AnnouncementFilterState = {
 
 const DEFAULT_SORT: GridSortModel = [];
 const DEFAULT_PAGINATION: GridPaginationModel = { pageSize: 25, page: 0 };
-
-/**
- * API からデータを取得
- */
-async function fetchAnnouncements(params: {
-  page: number;
-  pageSize: number;
-  filters: AnnouncementFilterState;
-  searchQuery: string;
-  sortModel: GridSortModel;
-}): Promise<{ data: any[]; total: number }> {
-  const { page, pageSize, filters, searchQuery, sortModel } = params;
-
-  // クエリパラメータを構築
-  const queryParams = new URLSearchParams();
-  queryParams.append('page', page.toString());
-  queryParams.append('pageSize', pageSize.toString());
-
-  // フィルター
-  if (filters.statuses.length > 0) {
-    queryParams.append('statuses', filters.statuses.join(','));
-  }
-  if (filters.bidTypes.length > 0) {
-    queryParams.append('bidTypes', filters.bidTypes.join(','));
-  }
-  if (filters.categories.length > 0) {
-    queryParams.append('categories', filters.categories.join(','));
-  }
-  if (filters.organizations.length > 0) {
-    queryParams.append('organizations', filters.organizations.join(','));
-  }
-  if (filters.prefectures.length > 0) {
-    queryParams.append('prefectures', filters.prefectures.join(','));
-  }
-
-  // 検索
-  if (searchQuery.trim()) {
-    queryParams.append('searchQuery', searchQuery.trim());
-  }
-
-  // ソート
-  if (sortModel.length > 0) {
-    const sort = sortModel[0];
-    queryParams.append('sortField', sort.field);
-    queryParams.append('sortOrder', sort.sort || 'asc');
-  }
-
-  const response = await fetch(getApiUrl(`/api/announcements?${queryParams.toString()}`));
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API Error:', response.status, errorText);
-    throw new Error(`Failed to fetch announcements: ${response.status} - ${errorText}`);
-  }
-
-  const result = await response.json();
-  console.log('Announcements API Response:', result);
-  return result;
-}
 
 /**
  * 入札案件一覧の状態管理フック
@@ -117,7 +60,7 @@ export function useAnnouncementListState() {
   );
 
   // データ取得状態
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<AnnouncementListRow[]>([]);
   const [rowCount, setRowCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

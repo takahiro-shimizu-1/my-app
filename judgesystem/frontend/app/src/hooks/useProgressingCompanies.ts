@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
-import { fetchWithTimeout, isAbortError } from '../utils/fetch';
+import { fetchProgressingCompanies as fetchProgressingCompaniesApi } from '../data/api';
+import { isAbortError } from '../utils/fetch';
 import type { ProgressingCompany } from '../components/announcement';
 import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 
@@ -81,30 +81,28 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
     if (!announcementNo) { setCompanies([]); return; }
     let isCancelled = false;
     const controller = new AbortController();
-    const fetchProgressingCompanies = async () => {
+    const loadProgressingCompanies = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetchWithTimeout(
-          getApiUrl(`/api/announcements/${announcementNo}/progressing-companies`),
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-        const data = await response.json();
+        const data = await fetchProgressingCompaniesApi(announcementNo, {
+          signal: controller.signal,
+        });
         if (isCancelled) return;
         setCompanies(
-          Array.isArray(data)
-            ? data.map((row: ProgressingCompanyApiRow) => ({
-                companyId: String(row.companyId ?? ''),
-                companyName: row.companyName ?? '',
-                branchId: String(row.branchId ?? ''),
-                branchName: row.branchName ?? '',
-                priority: normalizePriority(Number(row.priority ?? 1)),
-                workStatus: normalizeWorkStatus(row.workStatus ?? ''),
-                evaluationId: String(row.evaluationId ?? ''),
-                evaluationStatus: (row.evaluationStatus ?? 'unmet') as EvaluationStatus,
-              }))
-            : [],
+          data.map((row: unknown) => {
+            const r = row as ProgressingCompanyApiRow;
+            return {
+              companyId: String(r.companyId ?? ''),
+              companyName: r.companyName ?? '',
+              branchId: String(r.branchId ?? ''),
+              branchName: r.branchName ?? '',
+              priority: normalizePriority(Number(r.priority ?? 1)),
+              workStatus: normalizeWorkStatus(r.workStatus ?? ''),
+              evaluationId: String(r.evaluationId ?? ''),
+              evaluationStatus: (r.evaluationStatus ?? 'unmet') as EvaluationStatus,
+            };
+          }),
         );
       } catch (err) {
         if (!isCancelled) {
@@ -119,7 +117,7 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
         if (!isCancelled) setIsLoading(false);
       }
     };
-    fetchProgressingCompanies();
+    loadProgressingCompanies();
     return () => { isCancelled = true; controller.abort(); };
   }, [announcementNo]);
 
