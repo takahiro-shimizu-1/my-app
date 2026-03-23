@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GridFilterModel, GridSortModel, GridPaginationModel } from '@mui/x-data-grid';
 import { extractPrefecture } from '../constants/prefectures';
-import type { EvaluationStatus, FilterState } from '../types';
+import type { EvaluationStatus, FilterState, EvaluationApiItem, EvaluationListRow } from '../types';
 import { getApiUrl } from '../config/api';
 
 // ナビゲーション追跡用のsessionStorageキー
@@ -115,7 +115,7 @@ async function fetchEvaluations(params: {
   filters: FilterState;
   searchQuery: string;
   sortModel: GridSortModel;
-}): Promise<{ data: any[]; total: number }> {
+}): Promise<{ data: EvaluationApiItem[]; total: number }> {
   const { page, pageSize, filters, searchQuery, sortModel } = params;
 
   // クエリパラメータを構築
@@ -215,7 +215,7 @@ export function useBidListState() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // API状態
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<EvaluationListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -298,7 +298,7 @@ export function useBidListState() {
             throw new Error('Invalid API response: data is not an array');
           }
 
-          const mapped = result.data.map((e: any) => ({
+          const mapped = result.data.map((e: EvaluationApiItem): EvaluationListRow => ({
             id: e.id,
             evaluationNo: e.evaluationNo,
             status: e.status,
