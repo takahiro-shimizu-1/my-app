@@ -7,7 +7,7 @@ This package contains the sequential stages of the collector pipeline:
   Stage 2 - Link Extract:   Parse HTML to extract announcement links
   Stage 3 - Formatting:     Normalize and deduplicate extracted data
   Stage 4 - PDF Download:   Download and OCR bid-related PDF documents
-  Stage 6 - Gemini Extract: Use Gemini to extract structured data from PDFs
+  Stage 5 - Gemini Extract: Use Gemini to extract structured data from PDFs
 
 Each stage can be run independently via its __main__ block,
 or orchestrated sequentially through the FastAPI wrapper (api.py).
@@ -53,9 +53,9 @@ STAGES: list[StageInfo] = [
         description="Download PDF documents and extract text via OCR",
     ),
     StageInfo(
-        number=6,
+        number=5,
         name="gemini_extract",
-        module="stages.stage6_gemini_extract",
+        module="stages.stage5_gemini_extract",
         description="Use Gemini to extract structured fields from PDF text",
     ),
 ]

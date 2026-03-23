@@ -55,3 +55,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Collector data files (large)
+judgesystem/collector/data/*.txt

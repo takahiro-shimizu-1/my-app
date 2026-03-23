@@ -2,25 +2,8 @@
  * 協力会社マスターデータ（企業情報を統合）
  * 全ての会社データの単一真実源（Single Source of Truth）
  */
-import type {
-  PartnerListItem
-  //PastProject,
-  //CompanyBranch,
-  //Qualifications,
-  //UnifiedQualificationItem,
-  //OrdererQualificationItem,
-  //OrdererQualification
-} from '../types';
+import type { PartnerListItem } from '../types';
 import { getApiUrl } from '../config/api';
-//import {
-//  unifiedMainCategories,
-//  unifiedSubCategories,
-//  ordererCategories,
-//  ordererRegions,
-//  ordererOrganizations,
-//  grades as qualificationGrades,
-//  type UnifiedMainCategory,
-//} from '../constants/qualifications';
 
 
 const generatePartners = async (): Promise<PartnerListItem[]> => {
