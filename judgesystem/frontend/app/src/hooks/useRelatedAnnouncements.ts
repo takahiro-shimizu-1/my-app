@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { resolveAnnouncementStatus } from '../components/announcement';
 import { getOrganizationGroup } from '../constants/organizations';
 import { fetchRelatedAnnouncements as fetchRelatedAnnouncementsApi } from '../data/api';
+import { isAbortError } from '../utils/fetch';
 import type { AnnouncementStatus } from '../types/announcement';
 
 // -- Related announcement row returned by the API --
@@ -77,7 +78,6 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
     if (!announcementNo) { setBaseRelatedAnnouncements([]); return; }
     let isCancelled = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const loadRelated = async () => {
       setIsLoading(true);
       setError(null);
@@ -88,7 +88,7 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
         if (!isCancelled) setBaseRelatedAnnouncements(data as RelatedAnnouncement[]);
       } catch (err) {
         if (!isCancelled) {
-          if (err instanceof DOMException && err.name === 'AbortError') {
+          if (isAbortError(err)) {
             setError('リクエストがタイムアウトしました');
           } else {
             setError(err instanceof Error ? err.message : String(err));
@@ -96,12 +96,11 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
           setBaseRelatedAnnouncements([]);
         }
       } finally {
-        clearTimeout(timeoutId);
         if (!isCancelled) setIsLoading(false);
       }
     };
     loadRelated();
-    return () => { isCancelled = true; clearTimeout(timeoutId); controller.abort(); };
+    return () => { isCancelled = true; controller.abort(); };
   }, [announcementNo]);
 
   // Search handler
