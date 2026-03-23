@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getApiUrl } from '../config/api';
+import { fetchDocumentPreview } from '../data/api';
 import type { DocumentOcr } from '../types';
 
 // -- Types --
@@ -87,12 +87,9 @@ export function useDocumentPreview(
       });
 
       try {
-        const response = await fetch(
-          getApiUrl(`/api/announcements/${announcementNo}/documents/${docKey}/preview`),
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error(`Failed to fetch preview (${response.status})`);
-        const blob = await response.blob();
+        const blob = await fetchDocumentPreview(announcementNo, docKey, {
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
 
         const objectUrl = URL.createObjectURL(blob);

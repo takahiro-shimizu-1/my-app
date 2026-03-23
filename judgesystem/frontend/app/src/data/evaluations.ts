@@ -5,68 +5,19 @@
  *
  * Note: サーバーサイドページネーション移行により、全件取得は削除
  * データ取得は useBidListState で行う
+ *
+ * Note: API関数 (updateWorkStatus, updateEvaluationAssignee) は
+ * data/api/evaluationApi.ts に移動済み。後方互換のため re-export する。
  */
 import type {
-  WorkStatus,
   SimilarCase
 } from '../types';
 import { mockCompanies } from './companies';
-import { getApiUrl } from '../config/api';
 
-export const updateWorkStatus = async (
-  evaluationNo: string,
-  workStatus: WorkStatus,
-  currentStep?: string
-): Promise<boolean> => {
-  try {
-    const response = await fetch(getApiUrl(`/api/evaluations/${evaluationNo}`), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ workStatus, currentStep }),
-    });
+// -- Re-export API functions for backwards compatibility ---------------------
+export { updateWorkStatus, updateEvaluationAssignee } from './api/evaluationApi';
 
-    if (!response.ok) {
-      console.error(`Failed to update workStatus: ${response.status} ${response.statusText}`);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error updating workStatus:', error);
-    return false;
-  }
-};
-
-export const updateEvaluationAssignee = async (
-  evaluationNo: string,
-  stepId: string,
-  staffId: string
-): Promise<boolean> => {
-  try {
-    const response = await fetch(getApiUrl(`/api/evaluations/${evaluationNo}/assignees`), {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        stepId,
-        contactId: staffId || null,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Failed to update assignee: ${response.status} ${response.statusText}`);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error updating assignee:', error);
-    return false;
-  }
-};
+// -- Mock data (類似案件) ----------------------------------------------------
 
 // 類似案件のモックデータ（より多様な案件名）
 const similarCaseTemplates = [

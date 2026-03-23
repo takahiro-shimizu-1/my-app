@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getApiUrl } from '../config/api';
 import type { PastProject, PartnerDetail } from '../types/partner';
+import { fetchPartnerDetail } from '../data/api';
 import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 
 // -- Types --
@@ -65,21 +65,20 @@ export function usePartnerDetail() {
 
   // Fetch partner
   useEffect(() => {
-    const fetchPartner = async () => {
+    const loadPartner = async () => {
       if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(getApiUrl(`/api/partners/${id}`));
-        if (!response.ok) throw new Error(`Failed to fetch partner: ${response.status}`);
-        setPartner(await response.json() as PartnerDetail);
+        const data = await fetchPartnerDetail(id);
+        setPartner(data as PartnerDetail);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
     };
-    fetchPartner();
+    loadPartner();
   }, [id]);
 
   // Search handler
