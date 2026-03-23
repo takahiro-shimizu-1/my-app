@@ -39,7 +39,68 @@ services:
       - -lc
       - npm run dev -- --hostname 0.0.0.0 --port ${APP_PORT:-3000}
 
+  # ====================================
+  # Judgesystem services
+  # ====================================
+  judgesystem-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: judgesystem
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - judgesystem-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  judgesystem-backend:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    depends_on:
+      judgesystem-db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      PGHOST: judgesystem-db
+      PGPORT: "5432"
+      PGDATABASE: judgesystem
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      CORS_ORIGIN: "http://localhost:5176"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./judgesystem/backend/app:/app
+      - ./judgesystem/shared:/shared
+      - judgesystem-backend-node-modules:/app/node_modules
+    command: >
+      bash -c "npm install && npx tsx watch index.ts"
+
+  judgesystem-frontend:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    depends_on:
+      - judgesystem-backend
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5176:5173"
+    volumes:
+      - ./judgesystem/frontend/app:/app
+      - ./judgesystem/shared:/shared
+      - judgesystem-frontend-node-modules:/app/node_modules
+    command: >
+      bash -c "npm install && npx vite --host 0.0.0.0 --port 5173"
+
 volumes:
   my-app-node-modules:
   next-cache:
   npm-cache:
+  judgesystem-db-data:
+  judgesystem-backend-node-modules:
+  judgesystem-frontend-node-modules:

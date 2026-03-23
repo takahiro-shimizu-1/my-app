@@ -24,10 +24,14 @@ import { getApiUrl } from '../config/api';
 
 
 const generatePartners = async (): Promise<PartnerListItem[]> => {
-  const res = await fetch(getApiUrl('/api/partners'));
-  const data = await res.json();
-  //console.log("API response:", data);
-  return data;
+  try {
+    const res = await fetch(getApiUrl('/api/partners'));
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.data ?? []);
+  } catch {
+    return [];
+  }
 }
 
 // API から取得した実データをキャッシュとして保持

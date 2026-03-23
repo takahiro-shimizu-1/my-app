@@ -33,7 +33,7 @@ const generateCompanies = async (): Promise<CompanyWithDetails[]> => {
       throw new Error(`Failed to load companies: ${res.status} ${res.statusText}`);
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? data : (data.data ?? []);
   } catch (error) {
     console.error('Failed to fetch companies:', error);
     return [];
