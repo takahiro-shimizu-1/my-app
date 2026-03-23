@@ -1,7 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import { pool, schemaPrefix } from "./database";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, "..", "migrations");
 
 async function ensureMigrationsTable(): Promise<void> {
