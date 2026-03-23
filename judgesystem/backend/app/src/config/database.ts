@@ -1,5 +1,6 @@
 import { Pool, PoolConfig } from "pg";
 import { env } from "./env";
+import { logger } from "../utils/logger";
 
 const buildPoolConfig = (): PoolConfig => {
   const config: PoolConfig = env.DATABASE_URL
@@ -28,7 +29,7 @@ const buildPoolConfig = (): PoolConfig => {
 export const pool = new Pool(buildPoolConfig());
 
 pool.on("error", (err) => {
-  console.error("Unexpected PostgreSQL pool error:", err);
+  logger.error("PostgreSQL pool error", { error: err.message });
 });
 
 export const TABLES = {
