@@ -6,10 +6,14 @@ import type { Orderer } from '../types/orderer';
 import { getApiUrl } from '../config/api';
 
 const generateOrderers = async (): Promise<Orderer[]> => {
-  const res = await fetch(getApiUrl('/api/orderers'));
-  const data = await res.json();
-  //console.log("API response:", data);
-  return data;
+  try {
+    const res = await fetch(getApiUrl('/api/orderers'));
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.data ?? []);
+  } catch {
+    return [];
+  }
 }
 
 // エクスポート
