@@ -51,6 +51,19 @@ cloud "Google Cloud Platform" as GCP {
       component "StaffListPage" as StaffList
       component "AnalyticsPage" as Analytics
       component "MasterRegisterPage" as MasterReg
+
+      package "Custom Hooks" as FE_Hooks {
+        component "useAnnouncementDetail\n(composition)" as HookAnnDetail
+        component "useDocumentPreview" as HookDocPreview
+        component "useRelatedAnnouncements" as HookRelated
+        component "useProgressingCompanies" as HookProgressing
+        component "usePartnerDetail" as HookPartner
+      }
+    }
+
+    package "Backend Middleware\n(Express)" as BE_MW {
+      component "authMiddleware\n(Bearer token / dev mode)" as AuthMW
+      component "errorHandler\n(AppError -> JSON)" as ErrHandler
     }
 
     package "Backend Controllers\n(Express Router - index.ts)\nCloud Run" as BE_CTRL {
@@ -76,6 +89,12 @@ cloud "Google Cloud Platform" as GCP {
       component "CompanyController" as CompanyCtrl
     }
   }
+  note right of AuthMW
+    **認証フロー:**
+    - "/" と "/health" はスキップ
+    - API_KEY未設定: GET許可, 書込み拒否(403)
+    - API_KEY設定済: Bearer token必須(401)
+  end note
 
   ' ================================================================
   ' Business Logic層 (Service)
@@ -100,6 +119,7 @@ cloud "Google Cloud Platform" as GCP {
       - defaultWorkStatus() / defaultCurrentStep()
         / defaultPriority()
         NULL時のデフォルト値適用
+      **戻り値型:** PaginatedResponse<EvaluationListItem>
     end note
 
     component "AnnouncementService" as AnnSvc {
@@ -118,6 +138,7 @@ cloud "Google Cloud Platform" as GCP {
         NULL/空文字 -> 'unknown'
       - filterByStatuses() / sortByStatus()
         ステータスによるフィルタ・ソート
+      **戻り値型:** PaginatedResponse<AnnouncementListItem>
     end note
 
     component "DocumentService" as DocSvc {
@@ -131,6 +152,28 @@ cloud "Google Cloud Platform" as GCP {
       - フォールバック: "文字起こしデータがありません"
       - markdown_path を content に変換して返却
     end note
+
+    component "PartnerService" as PartnerSvc {
+      port "getList()" as svc_partner_list
+      port "getById()" as svc_partner_byid
+    }
+
+    component "OrdererService" as OrdererSvc {
+      port "getList()" as svc_orderer_list
+      port "getById()" as svc_orderer_byid
+    }
+
+    component "ContactService" as ContactSvc {
+      port "findAll()" as svc_contact_all
+      port "findById()" as svc_contact_byid
+      port "create()" as svc_contact_create
+      port "update()" as svc_contact_update
+      port "delete()" as svc_contact_delete
+    }
+
+    component "CompanyService" as CompanySvc {
+      port "search()" as svc_company_search
+    }
   }
 
   ' ================================================================
@@ -154,6 +197,9 @@ cloud "Google Cloud Platform" as GCP {
       - evaluation_statuses
       - evaluation_assignees
       - announcements_estimated_amounts
+      **findWithFilters:** Promise.all で
+      COUNT+DATA クエリ並列実行
+      **JOIN条件:** 数値比較（::text除去済）
     end note
 
     component "AnnouncementRepository" as AnnRepo {
@@ -162,7 +208,6 @@ cloud "Google Cloud Platform" as GCP {
       port "findProgressingCompanies()" as repo_ann_prog
       port "findSimilarCases()" as repo_ann_sim
       port "findDocumentMeta()" as repo_ann_docmeta
-      port "getDocumentFile()" as repo_ann_docfile
     }
     note right of AnnRepo
       **データI/Oのみ (SQLはここだけ)**
@@ -172,7 +217,31 @@ cloud "Google Cloud Platform" as GCP {
       - announcements_competing_company_bids_master
       - similar_cases_master
       - similar_cases_competitors
+      **findWithFilters:** Promise.all で
+      COUNT+DATA クエリ並列実行
     end note
+
+    component "PartnerRepository" as PartnerRepo {
+      port "findAll()" as repo_partner_all
+      port "findById()" as repo_partner_byid
+    }
+
+    component "OrdererRepository" as OrdererRepo {
+      port "findAll()" as repo_orderer_all
+      port "findById()" as repo_orderer_byid
+    }
+
+    component "ContactRepository" as ContactRepo {
+      port "findAll()" as repo_contact_all
+      port "findById()" as repo_contact_byid
+      port "create()" as repo_contact_create
+      port "update()" as repo_contact_update
+      port "delete()" as repo_contact_delete
+    }
+
+    component "CompanyRepository" as CompanyRepo {
+      port "search()" as repo_company_search
+    }
 
     component "GCS Utility\n(utils/gcs.ts)" as GcsUtil {
       port "readMarkdownFromGCS()" as gcs_read
@@ -219,12 +288,32 @@ BidDetail -down-> EvalCtrl : HTTP REST
 AnnList -down-> AnnCtrl : HTTP REST
 AnnDetail -down-> AnnCtrl : HTTP REST
 Analytics -down-> EvalCtrl : HTTP REST
+PartnerList -down-> PartnerCtrl : HTTP REST
+PartnerDetail -down-> PartnerCtrl : HTTP REST
+OrdererList -down-> OrdererCtrl : HTTP REST
+StaffList -down-> ContactCtrl : HTTP REST
+
+' Hooks -> Pages
+HookAnnDetail -up-> AnnDetail : compose
+HookDocPreview -up-> HookAnnDetail
+HookRelated -up-> HookAnnDetail
+HookProgressing -up-> HookAnnDetail
+
+' ==================================================================
+' Connections: Middleware -> Controller
+' ==================================================================
+AuthMW -down-> BE_CTRL : 認証通過後
+BE_CTRL -down-> ErrHandler : エラー時
 
 ' ==================================================================
 ' Connections: Controller -> Service
 ' ==================================================================
 EvalCtrl -down-> EvalSvc : 委譲
 AnnCtrl -down-> AnnSvc : 委譲
+PartnerCtrl -down-> PartnerSvc : 委譲
+OrdererCtrl -down-> OrdererSvc : 委譲
+ContactCtrl -down-> ContactSvc : 委譲
+CompanyCtrl -down-> CompanySvc : 委譲
 
 ' ==================================================================
 ' Connections: Service -> Repository / DocumentService
@@ -233,12 +322,20 @@ EvalSvc -down-> EvalRepo : データ取得/更新
 EvalSvc -right-> DocSvc : ドキュメント付与
 AnnSvc -down-> AnnRepo : データ取得
 AnnSvc -right-> DocSvc : ドキュメント付与
+PartnerSvc -down-> PartnerRepo : データ取得
+OrdererSvc -down-> OrdererRepo : データ取得
+ContactSvc -down-> ContactRepo : CRUD
+CompanySvc -down-> CompanyRepo : データ取得
 
 ' ==================================================================
 ' Connections: Repository -> External
 ' ==================================================================
-EvalRepo -down-> CloudSQL : SQL Query\n(pool.connect)
-AnnRepo -down-> CloudSQL : SQL Query\n(pool.connect)
+EvalRepo -down-> CloudSQL : SQL Query\n(pool.query / Promise.all)
+AnnRepo -down-> CloudSQL : SQL Query\n(pool.query / Promise.all)
+PartnerRepo -down-> CloudSQL : SQL Query
+OrdererRepo -down-> CloudSQL : SQL Query
+ContactRepo -down-> CloudSQL : SQL Query
+CompanyRepo -down-> CloudSQL : SQL Query
 DocSvc -down-> GcsUtil : GCS操作委譲
 GcsUtil -down-> GCS : Storage API
 

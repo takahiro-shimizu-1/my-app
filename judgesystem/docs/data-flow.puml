@@ -25,6 +25,7 @@ actor "利用者" as User
 
 box "Presentation層 (Controller + View)" #E3F2FD
   participant "React SPA\n(App.tsx)" as FE <<presentation>>
+  participant "authMiddleware" as AuthMW <<presentation>>
   participant "Express Router\n(index.ts)" as Router <<presentation>>
 end box
 
@@ -52,7 +53,15 @@ end box
 
 User -> FE : BidListPage を表示
 activate FE
-FE -> Router : GET /api/evaluations\n?page=0&pageSize=25&searchQuery=...
+FE -> AuthMW : GET /api/evaluations\n?page=0&pageSize=25&searchQuery=...
+activate AuthMW
+note right of AuthMW
+  **認証チェック:**
+  - API_KEY未設定: GET許可
+  - API_KEY設定済: Bearer token検証
+end note
+AuthMW -> Router : 認証通過
+deactivate AuthMW
 activate Router
 
 Router -> EvalSvc : **getList(filters)**
@@ -76,15 +85,20 @@ note right of EvalRepo
   - LIMIT / OFFSET でページネーション
 end note
 
-EvalRepo -> DB : SELECT ... FROM company_bid_judgement\nJOIN bid_announcements ...\nWHERE ... LIMIT $n OFFSET $m
+EvalRepo -> DB : **Promise.all([\n  pool.query(SELECT COUNT(*) ...),\n  pool.query(SELECT ... FROM company_bid_judgement\n    JOIN bid_announcements ...\n    WHERE ... LIMIT $n OFFSET $m)\n])**
 activate DB
-DB --> EvalRepo : rows[] + total count
+note right of DB
+  COUNT + DATA クエリを
+  別コネクションで並列実行
+  JOIN条件は数値比較（::text除去済）
+end note
+DB --> EvalRepo : [countResult, dataResult]
 deactivate DB
 
 EvalRepo --> EvalSvc : { data: rows[], total }
 deactivate EvalRepo
 
-EvalSvc --> Router : { data, total, page, pageSize }
+EvalSvc --> Router : PaginatedResponse<EvaluationListItem>\n{ data, total, page, pageSize }
 deactivate EvalSvc
 
 Router --> FE : 200 JSON response
@@ -100,7 +114,10 @@ deactivate FE
 
 User -> FE : BidDetailPage へ遷移
 activate FE
-FE -> Router : GET /api/evaluations/12345
+FE -> AuthMW : GET /api/evaluations/12345
+activate AuthMW
+AuthMW -> Router : 認証通過
+deactivate AuthMW
 activate Router
 
 Router -> EvalSvc : **getById("12345")**
@@ -116,7 +133,7 @@ note right of EvalRepo
   - documents に markdown_path を含む
 end note
 
-EvalRepo -> DB : SELECT ... WITH documents AS (...)\nWHERE evaluation_no = $1
+EvalRepo -> DB : SELECT ... WITH documents AS (...)\nWHERE evaluation_no = $1::integer
 activate DB
 DB --> EvalRepo : evaluation row\n(announcement.documents に markdown_path あり)
 deactivate DB
@@ -176,7 +193,10 @@ deactivate FE
 
 User -> FE : AnnouncementListPage を表示
 activate FE
-FE -> Router : GET /api/announcements\n?page=0&pageSize=25
+FE -> AuthMW : GET /api/announcements\n?page=0&pageSize=25
+activate AuthMW
+AuthMW -> Router : 認証通過
+deactivate AuthMW
 activate Router
 
 Router -> AnnSvc : **getList(filters)**
@@ -205,15 +225,18 @@ note right of AnnRepo
   - ページネーション (LIMIT / OFFSET)
 end note
 
-AnnRepo -> DB : SELECT announcement_no, "workName",\n"topAgencyName", "bidEndDate" ...\nFROM bid_announcements\nWHERE ... LIMIT $n OFFSET $m
+AnnRepo -> DB : **Promise.all([\n  pool.query(SELECT COUNT(*) ...),\n  pool.query(SELECT ... FROM bid_announcements\n    WHERE ... LIMIT $n OFFSET $m)\n])**
 activate DB
-DB --> AnnRepo : rows[] + total count
+note right of DB
+  COUNT + DATA クエリを並列実行
+end note
+DB --> AnnRepo : [countResult, dataResult]
 deactivate DB
 
 AnnRepo --> AnnSvc : { data: rows[], total }
 deactivate AnnRepo
 
-AnnSvc --> Router : { data, total, page, pageSize }
+AnnSvc --> Router : PaginatedResponse<AnnouncementListItem>\n{ data, total, page, pageSize }
 deactivate AnnSvc
 
 Router --> FE : 200 JSON response
@@ -229,7 +252,15 @@ deactivate FE
 
 User -> FE : ステータスを変更\n(例: "in_progress" -> "completed")
 activate FE
-FE -> Router : PATCH /api/evaluations/12345\n{ "workStatus": "completed",\n  "currentStep": "final_review" }
+FE -> AuthMW : PATCH /api/evaluations/12345\n{ "workStatus": "completed",\n  "currentStep": "final_review" }
+activate AuthMW
+note right of AuthMW
+  **書込み操作:**
+  API_KEY必須 (Bearer token検証)
+  未設定時は 403 で拒否
+end note
+AuthMW -> Router : 認証通過
+deactivate AuthMW
 activate Router
 
 Router -> EvalSvc : **updateWorkStatus("12345", "completed", "final_review")**
@@ -281,7 +312,10 @@ deactivate FE
 
 User -> FE : AnnouncementDetailPage へ遷移
 activate FE
-FE -> Router : GET /api/announcements/678
+FE -> AuthMW : GET /api/announcements/678
+activate AuthMW
+AuthMW -> Router : 認証通過
+deactivate AuthMW
 activate Router
 
 Router -> AnnSvc : **getByNo(678)**
