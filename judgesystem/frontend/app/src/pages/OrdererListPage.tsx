@@ -13,7 +13,8 @@ import {
   Business as BusinessIcon,
 } from '@mui/icons-material';
 import type { GridSortModel } from '@mui/x-data-grid';
-import { mockOrderers, ordererCategoryConfig } from '../data';
+import { ordererCategoryConfig } from '../data';
+import { useOrderers } from '../hooks';
 import { fontSizes, colors, pageStyles, iconStyles, borderRadius, listFilterChipStyles } from '../constants/styles';
 import { getOrganizationGroup } from '../constants/organizations';
 import { allPrefectures } from '../constants/prefectures';
@@ -28,11 +29,6 @@ function extractPrefecture(address: string): string {
   const match = address.match(/^(北海道|東京都|大阪府|京都府|.{2,3}県)/);
   return match ? match[1] : '';
 }
-
-// ユニークな都道府県を取得
-const uniquePrefectures = Array.from(
-  new Set(mockOrderers.map((o) => extractPrefecture(o.address)).filter(Boolean))
-).sort();
 
 // 行データの型
 interface RowData {
@@ -247,6 +243,15 @@ export default function OrdererListPage() {
   const navigate = useNavigate();
   const listContainerRef = useRef<HTMLDivElement>(null);
   const { rightPanelOpen, toggleRightPanel, closeRightPanel, isMobile } = useSidebar();
+  const { orderers } = useOrderers();
+
+  // Derive unique prefectures from loaded orderers
+  const uniquePrefectures = useMemo(() =>
+    Array.from(
+      new Set(orderers.map((o) => extractPrefecture(o.address)).filter(Boolean))
+    ).sort(),
+    [orderers],
+  );
 
   // 検索クエリ
   const [searchQuery, setSearchQuery] = useState('');
@@ -288,7 +293,7 @@ export default function OrdererListPage() {
 
   // フィルター適用後のデータ
   const filteredOrderers = useMemo(() => {
-    return mockOrderers.filter((orderer) => {
+    return orderers.filter((orderer) => {
       // 種別フィルター
       if (filters.categories.length > 0 && !filters.categories.includes(orderer.category)) {
         return false;
@@ -305,7 +310,7 @@ export default function OrdererListPage() {
       }
       return true;
     });
-  }, [filters]);
+  }, [orderers, filters]);
 
   // 行データに変換
   const ordererRows: RowData[] = useMemo(() => {

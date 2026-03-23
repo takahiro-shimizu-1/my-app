@@ -1,25 +1,23 @@
 /**
- * 案件マスターデータ
- * 全ての案件データの単一真実源（Single Source of Truth）
- * 発注者ID（ordererId）で発注者マスターを参照
+ * Announcement data module.
+ *
+ * Announcement list/detail data is fetched via the API layer
+ * (data/api/announcementApi.ts). This module provides an empty
+ * in-memory collection and legacy helper functions for backwards
+ * compatibility.
+ *
+ * New code should use fetchAnnouncements / fetchAnnouncementDetail
+ * from data/api/ instead.
  */
-//import type { AnnouncementWithStatus, Department, DocumentOcr, DocumentType, FileFormat } from '../types';
 import type { AnnouncementWithStatus } from '../types';
-//import type { AnnouncementStatus, BidType } from '../types/announcement';
-//import { mockOrderers } from './orderers';
-//import { mockCompanies } from './companies';
 
-// mockAnnouncements は使用しない（詳細ページでは個別にAPIから取得する）
-export const mockAnnouncements: AnnouncementWithStatus[] = [];
+/** Empty collection -- announcements are fetched per-page via the API. */
+export const announcements: AnnouncementWithStatus[] = [];
 
-// テスト用: 非常に長い案件名を1件追加
-//if (mockAnnouncements.length > 0) {
-//  mockAnnouncements[0].title = '令和6年度国土交通省関東地方整備局管内における道路橋梁長寿命化修繕工事及び耐震補強工事に係る設計業務委託（荒川水系河川管理施設点検・補修を含む複合案件）';
-//}
-
-// ヘルパー関数
+/** @deprecated Use fetchAnnouncementDetail from data/api instead. */
 export const findAnnouncementById = (id: string): AnnouncementWithStatus | undefined =>
-  mockAnnouncements.find(a => a.id === id);
+  announcements.find(a => a.id === id);
 
+/** @deprecated Use the API layer with ordererId filter instead. */
 export const getAnnouncementsByOrdererId = (ordererId: string): AnnouncementWithStatus[] =>
-  mockAnnouncements.filter(a => a.ordererId === ordererId);
+  announcements.filter(a => a.ordererId === ordererId);

@@ -1,25 +1,22 @@
 /**
- * 判定結果データ
- * 案件ID、企業IDで他のマスターを参照
- * BidEvaluationの形式を維持（ページ互換性のため）
+ * Evaluation data module.
  *
- * Note: サーバーサイドページネーション移行により、全件取得は削除
- * データ取得は useBidListState で行う
+ * Re-exports API functions from data/api/evaluationApi.ts for backwards
+ * compatibility. Also provides mock similar-case data for the workflow
+ * similar-cases panel.
  *
- * Note: API関数 (updateWorkStatus, updateEvaluationAssignee) は
- * data/api/evaluationApi.ts に移動済み。後方互換のため re-export する。
+ * Note: Server-side pagination means full data fetching is handled by
+ * useBidListState. Do not add bulk fetch logic here.
  */
 import type {
   SimilarCase
 } from '../types';
-import { mockCompanies } from './companies';
 
 // -- Re-export API functions for backwards compatibility ---------------------
 export { updateWorkStatus, updateEvaluationAssignee } from './api/evaluationApi';
 
-// -- Mock data (類似案件) ----------------------------------------------------
+// -- Mock data (similar cases) -----------------------------------------------
 
-// 類似案件のモックデータ（より多様な案件名）
 const similarCaseTemplates = [
   '令和{year}年度{district}地区道路拡幅工事',
   '令和{year}年度{district}橋梁補強工事',
@@ -48,16 +45,23 @@ const districts = [
   '上流', '下流', 'A', 'B', '甲', '乙', '第一', '第二', '本',
 ];
 
+/** Placeholder company names used by mock similar-case data. */
+const placeholderCompanies = [
+  '建設A社', '建設B社', '建設C社', '建設D社', '建設E社',
+  '建設F社', '建設G社', '建設H社', '建設I社', '建設J社',
+  '建設K社', '建設L社', '建設M社', '建設N社', '建設O社',
+  '建設P社', '建設Q社', '建設R社', '建設S社', '建設T社',
+  '建設U社', '建設V社', '建設W社', '建設X社', '建設Y社',
+  '建設Z社', '建設AA社', '建設BB社', '建設CC社', '建設DD社',
+];
+
 const generateSimilarCases = (): SimilarCase[] => {
   const cases: SimilarCase[] = [];
-
-  // 企業マスターから落札企業を選択
-  const topCompanies = mockCompanies.slice(0, 30).map(c => c.name);
 
   for (let i = 0; i < 50; i++) {
     const template = similarCaseTemplates[i % similarCaseTemplates.length];
     const district = districts[i % districts.length];
-    const year = 5 + (i % 3); // 令和5〜7年
+    const year = 5 + (i % 3);
     const num = (i % 3) + 1;
 
     const caseName = template
@@ -65,14 +69,13 @@ const generateSimilarCases = (): SimilarCase[] => {
       .replace('{district}', district)
       .replace('{num}', String(num));
 
-    const winningCompany = topCompanies[i % topCompanies.length];
-    const winningAmount = (Math.floor(i * 7 + 10) % 90 + 10) * 10000000; // 1億〜10億
+    const winningCompany = placeholderCompanies[i % placeholderCompanies.length];
+    const winningAmount = (Math.floor(i * 7 + 10) % 90 + 10) * 10000000;
 
-    // 競合会社（3〜6社）
     const competitorCount = 3 + (i % 4);
     const competitors = [winningCompany];
     for (let j = 1; j < competitorCount; j++) {
-      const competitor = topCompanies[(i + j * 3) % topCompanies.length];
+      const competitor = placeholderCompanies[(i + j * 3) % placeholderCompanies.length];
       if (!competitors.includes(competitor)) {
         competitors.push(competitor);
       }
@@ -80,7 +83,7 @@ const generateSimilarCases = (): SimilarCase[] => {
 
     cases.push({
       id: `similar-${i + 1}`,
-      announcementId: `ann-${i + 1}`,  // 入札案件IDと紐づけ
+      announcementId: `ann-${i + 1}`,
       similarAnnouncementId: `ann-${((i + 5) % 50) + 1}`,
       caseName,
       winningCompany,
@@ -92,11 +95,10 @@ const generateSimilarCases = (): SimilarCase[] => {
   return cases;
 };
 
-export const mockSimilarCases: SimilarCase[] = generateSimilarCases();
+export const similarCases: SimilarCase[] = generateSimilarCases();
 
 export const getSimilarCases = (count: number = 5): SimilarCase[] => {
-  // 固定シードでシャッフル（毎回同じ結果）
-  const shuffled = [...mockSimilarCases].sort((a, b) => {
+  const shuffled = [...similarCases].sort((a, b) => {
     const hashA = a.id.charCodeAt(a.id.length - 1);
     const hashB = b.id.charCodeAt(b.id.length - 1);
     return hashA - hashB;

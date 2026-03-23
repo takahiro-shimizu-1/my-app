@@ -32,8 +32,15 @@ export type {
   FetchStatusCountsParams,
 } from './evaluationApi';
 
+// Orderer API
+export { fetchOrderers } from './ordererApi';
+
+// Company API
+export { fetchCompanies } from './companyApi';
+export type { CompanyWithDetails } from './companyApi';
+
 // Partner API
-export { fetchPartnerDetail } from './partnerApi';
+export { fetchPartnerList, fetchPartnerDetail } from './partnerApi';
 
 // Document API
 export { fetchDocumentPreview } from './documentApi';

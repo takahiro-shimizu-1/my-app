@@ -1,64 +1,37 @@
 /**
- * 企業マスターデータ
- * 全ての企業データの単一真実源（Single Source of Truth）
- * ※このデータはevaluations.tsとannouncements.tsで参照されます
+ * Company data module.
+ *
+ * Re-exports the fetch function and type from the API layer.
+ * Callers should use fetchCompanies directly or via a hook.
  */
 import type { CompanyPriority } from '../types';
-import { getApiUrl } from '../config/api';
+import type { CompanyWithDetails } from './api/companyApi';
 
-// 企業詳細情報（内部型）
-interface CompanyWithDetails {
-  id: string;
-  no: number;
-  name: string;
-  address: string;
-  grade: string;
-  priority: CompanyPriority;
-  phone: string;
-  email: string;
-  fax?: string | null;
-  postalCode?: string | null;
-  representative: string;
-  established: string;
-  capital: number;
-  employeeCount: number;
-  branches: { name: string; address: string }[];
-  certifications: string[];
-}
+export { fetchCompanies } from './api/companyApi';
+export type { CompanyWithDetails } from './api/companyApi';
 
-const generateCompanies = async (): Promise<CompanyWithDetails[]> => {
-  try {
-    const res = await fetch(getApiUrl('/api/companies'));
-    if (!res.ok) {
-      throw new Error(`Failed to load companies: ${res.status} ${res.statusText}`);
-    }
-    const data = await res.json();
-    return Array.isArray(data) ? data : (data.data ?? []);
-  } catch (error) {
-    console.error('Failed to fetch companies:', error);
-    return [];
-  }
+/**
+ * Return a default company priority.
+ *
+ * TODO: Implement proper priority lookup once company priority data
+ * is available from the API.
+ */
+export const getCompanyPriority = (_name: string): CompanyPriority => {
+  return 5;
 };
 
+/**
+ * @deprecated Companies are now fetched asynchronously via fetchCompanies.
+ * This function always returns undefined. Migrate to the hook/API pattern.
+ */
+export const findCompanyById = (_id: string): CompanyWithDetails | undefined => {
+  return undefined;
+};
 
-// エクスポート
-//export const mockCompanies: CompanyWithDetails[] = generateCompanies();
-export const mockCompanies: CompanyWithDetails[] = await generateCompanies();
-
-
-// ヘルパー関数
-export const findCompanyById = (id: string): CompanyWithDetails | undefined =>
-  mockCompanies.find(c => c.id === id);
-
-export const findCompanyByName = (name: string): CompanyWithDetails | undefined =>
-  mockCompanies.find(c => c.name === name);
-
-//export const getCompanyPriority = (name: string): CompanyPriority => {
-//  const company = companyList.find(c => c.name === name);
-//  return company?.priority ?? 5;
-//};
-export const getCompanyPriority = (_name: string): CompanyPriority => {
-  //const company = companyList.find(c => c.name === name);
-  //return company?.priority ?? 5;
-  return 5;
+/**
+ * @deprecated Companies are now fetched asynchronously via fetchCompanies.
+ * This function always returns undefined. Migrate to the hook/API pattern.
+ */
+export const findCompanyByName = (_name: string): CompanyWithDetails | undefined => {
+  return undefined;
 };

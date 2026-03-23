@@ -15,7 +15,8 @@ import {
   Phone as PhoneIcon,
 } from '@mui/icons-material';
 import type { GridSortModel } from '@mui/x-data-grid';
-import { partners, allCategories } from '../data';
+import { allCategories } from '../data';
+import { usePartners } from '../hooks';
 import { colors, pageStyles, fontSizes, chipStyles, listFilterChipStyles, iconStyles, borderRadius } from '../constants/styles';
 import { allPrefectures, extractPrefecture } from '../constants/prefectures';
 import { CustomPagination } from '../components/bid';
@@ -271,6 +272,7 @@ const NAV_TRACKING_KEY = 'lastVisitedPath';
 export default function PartnerListPage() {
   const navigate = useNavigate();
   const { rightPanelOpen, toggleRightPanel, closeRightPanel, isMobile } = useSidebar();
+  const { partners } = usePartners();
   const [conditionTab, setConditionTab] = useState<'sort' | 'filter'>('sort');
   const listContainerRef = useRef<HTMLDivElement>(null);
 
