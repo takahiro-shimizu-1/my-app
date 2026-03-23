@@ -61,16 +61,21 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
 
   const [companies, setCompanies] = useState<ProgressingCompany[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch from API
   useEffect(() => {
     if (!announcementNo) { setCompanies([]); return; }
     let isCancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const fetchProgressingCompanies = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const response = await fetch(
           getApiUrl(`/api/announcements/${announcementNo}/progressing-companies`),
+          { signal: controller.signal },
         );
         if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
         const data = await response.json();
@@ -90,14 +95,21 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
             : [],
         );
       } catch (err) {
-        console.error('Failed to fetch progressing companies:', err);
-        if (!isCancelled) setCompanies([]);
+        if (!isCancelled) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            setError('リクエストがタイムアウトしました');
+          } else {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+          setCompanies([]);
+        }
       } finally {
+        clearTimeout(timeoutId);
         if (!isCancelled) setIsLoading(false);
       }
     };
     fetchProgressingCompanies();
-    return () => { isCancelled = true; };
+    return () => { isCancelled = true; clearTimeout(timeoutId); controller.abort(); };
   }, [announcementNo]);
 
   // Search handler
@@ -159,7 +171,7 @@ export function useProgressingCompanies(announcementNo: string | undefined) {
     sortOption, setSortOption,
     filters, setFilters,
     page, setPage, pageSize,
-    companies, isLoading,
+    companies, isLoading, error,
     filteredCompanies,
     paginatedCompanies,
     total: filteredCompanies.length,

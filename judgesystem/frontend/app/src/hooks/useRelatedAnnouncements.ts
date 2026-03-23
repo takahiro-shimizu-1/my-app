@@ -53,25 +53,41 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
 
   // Base data fetched from API
   const [baseRelatedAnnouncements, setBaseRelatedAnnouncements] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!announcementNo) { setBaseRelatedAnnouncements([]); return; }
     let isCancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const fetchRelated = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const response = await fetch(
           getApiUrl(`/api/announcements/${announcementNo}/related`),
+          { signal: controller.signal },
         );
         if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
         const data = await response.json();
         if (!isCancelled) setBaseRelatedAnnouncements(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error('Failed to fetch related announcements:', err);
-        if (!isCancelled) setBaseRelatedAnnouncements([]);
+        if (!isCancelled) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            setError('リクエストがタイムアウトしました');
+          } else {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+          setBaseRelatedAnnouncements([]);
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        if (!isCancelled) setIsLoading(false);
       }
     };
     fetchRelated();
-    return () => { isCancelled = true; };
+    return () => { isCancelled = true; clearTimeout(timeoutId); controller.abort(); };
   }, [announcementNo]);
 
   // Search handler
@@ -148,5 +164,7 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
     total: filteredAnnouncements.length,
     handleSearchChange,
     clear,
+    error,
+    isLoading,
   };
 }

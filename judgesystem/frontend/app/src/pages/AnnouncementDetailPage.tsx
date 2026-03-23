@@ -1149,26 +1149,34 @@ export default function AnnouncementDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const fetchAnnouncement = async () => {
-      if (!id) return;
       setLoading(true);
       setError(null);
       try {
         // id から ann- プレフィックスを除去して公告番号を取得
         const announcementNo = id.startsWith('ann-') ? id.substring(4) : id;
-        const response = await fetch(getApiUrl(`/api/announcements/${announcementNo}`));
+        const response = await fetch(getApiUrl(`/api/announcements/${announcementNo}`), { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Failed to fetch announcement: ${response.status}`);
         }
         const data = await response.json();
         setAnnouncement(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setError('リクエストがタイムアウトしました');
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     };
     fetchAnnouncement();
+    return () => { clearTimeout(timeoutId); controller.abort(); };
   }, [id]);
 
   // Composed hooks
