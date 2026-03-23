@@ -1,6 +1,6 @@
 import { AnnouncementRepository } from "../repositories/announcementRepository";
 import { DocumentService } from "./documentService";
-import type { FilterParams, AnnouncementStatus } from "../../../../shared/types";
+import type { FilterParams, PaginatedResponse, AnnouncementListItem, AnnouncementStatus } from "../../../../shared/types";
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from "../../../../shared/constants";
 
 /**
@@ -95,7 +95,7 @@ export class AnnouncementService {
    */
   async getList(
     filters: FilterParams
-  ): Promise<{ data: any[]; total: number; page: number; pageSize: number }> {
+  ): Promise<PaginatedResponse<AnnouncementListItem>> {
     const page = filters.page ?? DEFAULT_PAGE;
     const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
 

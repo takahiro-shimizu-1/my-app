@@ -15,6 +15,7 @@ interface EnvConfig {
   PGSSLMODE: string;
   PG_SCHEMA: string;
   GCS_BUCKET: string | undefined;
+  API_KEY: string | undefined;
 }
 
 function parseEnv(): EnvConfig {
@@ -45,6 +46,7 @@ function parseEnv(): EnvConfig {
     PGSSLMODE: (process.env.PGSSLMODE ?? process.env.PGSSL ?? "").toLowerCase(),
     PG_SCHEMA: process.env.PG_SCHEMA ?? "",
     GCS_BUCKET: process.env.GCS_BUCKET,
+    API_KEY: process.env.API_KEY,
   };
 }
 

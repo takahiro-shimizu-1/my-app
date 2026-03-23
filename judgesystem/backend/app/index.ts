@@ -13,6 +13,7 @@ import {
   companyRoutes,
 } from "./src/routes";
 import { errorHandler } from "./src/middleware/errorHandler";
+import { authMiddleware } from "./src/middleware/auth";
 
 const app = express();
 
@@ -26,6 +27,9 @@ app.use(cors({
 app.options("*", cors());
 app.use(compression());
 app.use(express.json());
+
+// Authentication
+app.use(authMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {

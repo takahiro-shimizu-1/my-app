@@ -7,54 +7,44 @@ export class AnnouncementRepository {
    * bid_announcements テーブルから一覧表示に必要な最小限のデータを取得
    */
   async findWithFilters(filters: FilterParams): Promise<{ data: any[]; total: number }> {
-    const client = await pool.connect();
-    try {
-      // Build WHERE clause
-      const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
+    const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
 
-      // Get total count
-      const countQuery = `
-        SELECT COUNT(*) as count
-        FROM ${schemaPrefix}bid_announcements
-        ${whereClause}
-      `;
-      const countResult = await client.query(countQuery, queryParams);
-      const total = parseInt(countResult.rows[0].count);
+    const page = filters.page || 0;
+    const pageSize = filters.pageSize || 25;
+    const offset = page * pageSize;
 
-      // Build ORDER BY clause
-      const orderByClause = this.buildOrderByClause(filters.sortField, filters.sortOrder);
+    const countQuery = `SELECT COUNT(*) as count FROM ${schemaPrefix}bid_announcements ${whereClause}`;
 
-      // Get paginated data
-      const page = filters.page || 0;
-      const pageSize = filters.pageSize || 25;
-      const offset = page * pageSize;
+    const orderByClause = this.buildOrderByClause(filters.sortField, filters.sortOrder);
 
-      const dataQuery = `
-        SELECT
-          CONCAT('ann-', announcement_no) AS id,
-          announcement_no AS "announcementNo",
-          COALESCE("workName", '') AS title,
-          COALESCE("topAgencyName", '') AS organization,
-          COALESCE(category, '') AS category,
-          COALESCE("bidType", 'unknown') AS "bidType",
-          COALESCE("workPlace", '') AS "workLocation",
-          COALESCE("publishDate", '') AS "publishDate",
-          COALESCE("bidEndDate", '') AS deadline
-        FROM ${schemaPrefix}bid_announcements
-        ${whereClause}
-        ${orderByClause}
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-      `;
-      const dataParams = [...queryParams, pageSize, offset];
-      const dataResult = await client.query(dataQuery, dataParams);
+    const dataQuery = `
+      SELECT
+        CONCAT('ann-', announcement_no) AS id,
+        announcement_no AS "announcementNo",
+        COALESCE("workName", '') AS title,
+        COALESCE("topAgencyName", '') AS organization,
+        COALESCE(category, '') AS category,
+        COALESCE("bidType", 'unknown') AS "bidType",
+        COALESCE("workPlace", '') AS "workLocation",
+        COALESCE("publishDate", '') AS "publishDate",
+        COALESCE("bidEndDate", '') AS deadline
+      FROM ${schemaPrefix}bid_announcements
+      ${whereClause}
+      ${orderByClause}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    const dataParams = [...queryParams, pageSize, offset];
 
-      return {
-        data: dataResult.rows,
-        total,
-      };
-    } finally {
-      client.release();
-    }
+    // Run COUNT and DATA queries in parallel using pool.query (auto-release)
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(countQuery, queryParams),
+      pool.query(dataQuery, dataParams),
+    ]);
+
+    return {
+      data: dataResult.rows,
+      total: parseInt(countResult.rows[0].count),
+    };
   }
 
   /**

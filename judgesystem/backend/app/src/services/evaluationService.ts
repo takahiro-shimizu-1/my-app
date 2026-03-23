@@ -1,6 +1,6 @@
 import { EvaluationRepository } from "../repositories/evaluationRepository";
 import { DocumentService } from "./documentService";
-import type { FilterParams } from "../../../../shared/types";
+import type { FilterParams, PaginatedResponse, EvaluationListItem } from "../../../../shared/types";
 import type { EvaluationStatus, WorkStatus, CurrentStep } from "../../../../shared/types";
 import { VALID_WORK_STATUSES, VALID_CURRENT_STEPS } from "../../../../shared/types";
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from "../../../../shared/constants";
@@ -112,7 +112,7 @@ export class EvaluationService {
    */
   async getList(
     filters: FilterParams
-  ): Promise<{ data: any[]; total: number; page: number; pageSize: number }> {
+  ): Promise<PaginatedResponse<EvaluationListItem>> {
     const page = filters.page ?? DEFAULT_PAGE;
     const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
 

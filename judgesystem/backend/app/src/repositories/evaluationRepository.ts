@@ -22,78 +22,75 @@ export class EvaluationRepository {
    * Get paginated evaluations list with filters
    */
   async findWithFilters(filters: FilterParams): Promise<{ data: any[]; total: number }> {
-    const client = await pool.connect();
-    try {
-      const tables = this.getQualifiedTables();
-      const baseFromClause = this.getBaseFromClause(tables);
+    const tables = this.getQualifiedTables();
+    const baseFromClause = this.getBaseFromClause(tables);
 
-      // Build WHERE clause (no status/workStatus filtering - Service handles that)
-      const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
+    // Build WHERE clause (no status/workStatus filtering - Service handles that)
+    const { whereClause, queryParams, paramIndex } = this.buildWhereClause(filters);
 
-      // Get total count
-      const countQuery = `SELECT COUNT(*) as count ${baseFromClause} ${whereClause}`;
-      const countResult = await client.query(countQuery, queryParams);
-      const total = parseInt(countResult.rows[0].count);
+    // Build ORDER BY clause
+    const orderByClause = this.buildOrderByClause(filters.sortField, filters.sortOrder);
 
-      // Build ORDER BY clause
-      const orderByClause = this.buildOrderByClause(filters.sortField, filters.sortOrder);
+    // Pagination
+    const page = filters.page || 0;
+    const pageSize = filters.pageSize || 25;
+    const offset = page * pageSize;
 
-      // Get paginated data
-      const page = filters.page || 0;
-      const pageSize = filters.pageSize || 25;
-      const offset = page * pageSize;
+    const countQuery = `SELECT COUNT(*) as count ${baseFromClause} ${whereClause}`;
 
-      const dataQuery = `
-        SELECT
-          cbj.evaluation_no::text AS id,
-          cbj.evaluation_no::text AS "evaluationNo",
-          jsonb_build_object(
-            'title', COALESCE(ba."workName", ''),
-            'organization', COALESCE(ba."topAgencyName", ''),
-            'category', COALESCE(ba.category, ''),
-            'bidType', COALESCE(ba."bidType", ''),
-            'deadline', COALESCE(ba."bidEndDate", ''),
-            'workLocation', COALESCE(ba."workPlace", ''),
-            'estimatedAmountMin', aea.estimated_amount_min,
-            'estimatedAmountMax', aea.estimated_amount_max
-          ) AS announcement,
-          jsonb_build_object(
-            'name', COALESCE(cm.company_name, '')
-          ) AS company,
-          jsonb_build_object(
-            'id', CONCAT('brn-', cbj.office_no),
-            'name', COALESCE(om.office_name, ''),
-            'address', COALESCE(om.office_address, ''),
-            'phone', COALESCE(om.office_telephone, ''),
-            'email', COALESCE(om.office_email, ''),
-            'fax', COALESCE(om.office_fax, ''),
-            'postalCode', COALESCE(om.office_postal_code, '')
-          ) AS branch,
-          cbj.final_status AS "finalStatus",
-          cbj.requirement_ineligibility AS "requirementIneligibility",
-          cbj.requirement_grade_item AS "requirementGradeItem",
-          cbj.requirement_location AS "requirementLocation",
-          cbj.requirement_experience AS "requirementExperience",
-          cbj.requirement_technician AS "requirementTechnician",
-          cbj.requirement_other AS "requirementOther",
-          evs."workStatus" AS "workStatus",
-          evs."currentStep" AS "currentStep",
-          cbj."updatedDate" AS "evaluatedAt"
-        ${baseFromClause}
-        ${whereClause}
-        ${orderByClause || "ORDER BY cbj.evaluation_no DESC"}
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-      `;
-      const dataParams = [...queryParams, pageSize, offset];
-      const dataResult = await client.query(dataQuery, dataParams);
+    const dataQuery = `
+      SELECT
+        cbj.evaluation_no::text AS id,
+        cbj.evaluation_no::text AS "evaluationNo",
+        jsonb_build_object(
+          'title', COALESCE(ba."workName", ''),
+          'organization', COALESCE(ba."topAgencyName", ''),
+          'category', COALESCE(ba.category, ''),
+          'bidType', COALESCE(ba."bidType", ''),
+          'deadline', COALESCE(ba."bidEndDate", ''),
+          'workLocation', COALESCE(ba."workPlace", ''),
+          'estimatedAmountMin', aea.estimated_amount_min,
+          'estimatedAmountMax', aea.estimated_amount_max
+        ) AS announcement,
+        jsonb_build_object(
+          'name', COALESCE(cm.company_name, '')
+        ) AS company,
+        jsonb_build_object(
+          'id', CONCAT('brn-', cbj.office_no),
+          'name', COALESCE(om.office_name, ''),
+          'address', COALESCE(om.office_address, ''),
+          'phone', COALESCE(om.office_telephone, ''),
+          'email', COALESCE(om.office_email, ''),
+          'fax', COALESCE(om.office_fax, ''),
+          'postalCode', COALESCE(om.office_postal_code, '')
+        ) AS branch,
+        cbj.final_status AS "finalStatus",
+        cbj.requirement_ineligibility AS "requirementIneligibility",
+        cbj.requirement_grade_item AS "requirementGradeItem",
+        cbj.requirement_location AS "requirementLocation",
+        cbj.requirement_experience AS "requirementExperience",
+        cbj.requirement_technician AS "requirementTechnician",
+        cbj.requirement_other AS "requirementOther",
+        evs."workStatus" AS "workStatus",
+        evs."currentStep" AS "currentStep",
+        cbj."updatedDate" AS "evaluatedAt"
+      ${baseFromClause}
+      ${whereClause}
+      ${orderByClause || "ORDER BY cbj.evaluation_no DESC"}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    const dataParams = [...queryParams, pageSize, offset];
 
-      return {
-        data: dataResult.rows,
-        total,
-      };
-    } finally {
-      client.release();
-    }
+    // Run COUNT and DATA queries in parallel using pool.query (auto-release)
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(countQuery, queryParams),
+      pool.query(dataQuery, dataParams),
+    ]);
+
+    return {
+      data: dataResult.rows,
+      total: parseInt(countResult.rows[0].count),
+    };
   }
 
   /**
