@@ -19,10 +19,17 @@ const buildPoolConfig = (): PoolConfig => {
     };
   }
 
+  config.connectionTimeoutMillis = 10000; // 10 seconds
+  config.idleTimeoutMillis = 30000; // 30 seconds
+
   return config;
 };
 
 export const pool = new Pool(buildPoolConfig());
+
+pool.on("error", (err) => {
+  console.error("Unexpected PostgreSQL pool error:", err);
+});
 
 export const TABLES = {
   orderers: "bid_orderers",
