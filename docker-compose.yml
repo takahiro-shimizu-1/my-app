@@ -112,6 +112,8 @@ services:
       PGPASSWORD: postgres
     ports:
       - "8082:8000"
+    volumes:
+      - ../judgesystem/data/master:/app/data/master:ro
 
   judgesystem-collector:
     build:
