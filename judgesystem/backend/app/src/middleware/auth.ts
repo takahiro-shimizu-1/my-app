@@ -1,4 +1,6 @@
+import crypto from "crypto";
 import { Request, Response, NextFunction } from "express";
+import { env } from "../config/env";
 
 /**
  * API Key authentication middleware.
@@ -14,7 +16,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
-  const apiKey = process.env.API_KEY;
+  const apiKey = env.API_KEY;
   const isWriteOperation = ["POST", "PATCH", "PUT", "DELETE"].includes(req.method);
 
   // If no API_KEY configured: dev mode
@@ -41,7 +43,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const token = authHeader.substring(7);
-  if (token !== apiKey) {
+  const tokenBuf = Buffer.from(token);
+  const apiKeyBuf = Buffer.from(apiKey);
+  if (tokenBuf.length !== apiKeyBuf.length || !crypto.timingSafeEqual(tokenBuf, apiKeyBuf)) {
     res.status(401).json({
       error: "Invalid API key",
       code: "UNAUTHORIZED",
