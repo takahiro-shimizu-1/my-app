@@ -18,7 +18,7 @@ import { categories } from '../constants/categories';
 import { bidTypes } from '../constants/bidType';
 import { prefecturesByRegion } from '../constants/prefectures';
 import { organizationGroupsByRegion, getOrganizationGroup } from '../constants/organizations';
-import { NotFoundView, FloatingBackButton, ScrollToTopButton } from '../components/common';
+import { NotFoundView, FloatingBackButton, ScrollToTopButton, FilterButton } from '../components/common';
 import { CustomPagination } from '../components/bid';
 import { RightSidePanel } from '../components/layout';
 import {
@@ -145,60 +145,6 @@ const normalizePriority = (value: number): CompanyPriority => {
 const normalizeWorkStatus = (value: string): Extract<WorkStatus, 'in_progress' | 'completed'> => {
   return value === 'completed' ? 'completed' : 'in_progress';
 };
-
-// フィルターボタン
-function FilterButton({
-  label,
-  selected,
-  onClick,
-  color,
-  bgColor,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-  color?: string;
-  bgColor?: string;
-}) {
-  return (
-    <Box
-      component="button"
-      onClick={onClick}
-      sx={{
-        position: 'relative',
-        padding: '6px 12px',
-        paddingLeft: selected ? '14px' : '12px',
-        borderRadius: borderRadius.xs,
-        fontSize: fontSizes.xs,
-        fontWeight: selected ? 600 : 500,
-        cursor: 'pointer',
-        border: `1px solid ${selected ? (color || colors.accent.blue) : rightPanelColors.inputBorder}`,
-        transition: 'all 0.2s ease',
-        backgroundColor: selected ? bgColor || `${colors.accent.blue}26` : 'transparent',
-        color: selected ? (color || colors.text.white) : rightPanelColors.textMuted,
-        overflow: 'hidden',
-        ...(selected && {
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '3px',
-            backgroundColor: color || colors.accent.blue,
-          },
-        }),
-        '&:hover': {
-          backgroundColor: selected ? bgColor || `${colors.accent.blue}33` : 'rgba(255, 255, 255, 0.06)',
-          color: selected ? (color || colors.text.white) : rightPanelColors.text,
-          borderColor: selected ? (color || colors.accent.blue) : `${colors.text.light}99`,
-        },
-      }}
-    >
-      {label}
-    </Box>
-  );
-}
 
 // 関連案件用表示条件パネル
 interface RelatedConditionsPanelProps {

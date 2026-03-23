@@ -8,6 +8,8 @@ export {
   defaultWorkStatus,
   defaultCurrentStep,
   defaultPriority,
+  validateWorkStatus,
+  validateCurrentStep,
 } from "./evaluationService";
 
 export {
