@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Typography, Button, Paper, TextField, InputAdornment, IconButton } from '@mui/material';
 import {
@@ -17,7 +17,8 @@ import { priorityLabels, priorityColors } from '../constants/priority';
 import { categories } from '../constants/categories';
 import { bidTypes } from '../constants/bidType';
 import { prefecturesByRegion } from '../constants/prefectures';
-import { organizationGroupsByRegion, getOrganizationGroup } from '../constants/organizations';
+import { organizationGroupsByRegion } from '../constants/organizations';
+import { workStatusConfig } from '../constants/workStatus';
 import { NotFoundView, FloatingBackButton, ScrollToTopButton, FilterButton } from '../components/common';
 import { CustomPagination } from '../components/bid';
 import { RightSidePanel } from '../components/layout';
@@ -31,19 +32,16 @@ import {
   CompetingCompaniesSection,
 } from '../components/announcement';
 import type { AnnouncementDetail } from '../components/announcement';
-import type { ProgressingCompany } from '../components/announcement';
 import { useSidebar } from '../contexts/SidebarContext';
 import type { BidType, AnnouncementStatus } from '../types/announcement';
-import type { EvaluationStatus, WorkStatus, CompanyPriority, DocumentOcr } from '../types';
+import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
 import { getApiUrl } from '../config/api';
-
-// 関連案件用ソートオプション
-type SortOption = 'deadline_asc' | 'deadline_desc' | 'publish_asc' | 'publish_desc' | 'status_asc' | 'status_desc' | 'prefecture_asc' | 'prefecture_desc';
-
-// 着手企業用ソートオプション
-type CompanySortOption = 'priority_asc' | 'priority_desc' | 'workStatus_asc' | 'workStatus_desc' | 'company_asc' | 'company_desc' | 'evaluationStatus_asc' | 'evaluationStatus_desc';
-
-type PreviewState = { url?: string; loading: boolean; error?: string };
+import { useDocumentPreview } from '../hooks/useDocumentPreview';
+import { useRelatedAnnouncements } from '../hooks/useRelatedAnnouncements';
+import { useProgressingCompanies } from '../hooks/useProgressingCompanies';
+import type { SortOption } from '../hooks/useRelatedAnnouncements';
+import type { RelatedFilterState } from '../hooks/useRelatedAnnouncements';
+import type { CompanySortOption, CompanyFilterState } from '../hooks/useProgressingCompanies';
 
 // ソートフィールド定義
 const SORT_FIELDS = [
@@ -77,74 +75,17 @@ const COMPANY_FILTER_TABS = [
   { id: 'priority', label: '優先度' },
 ] as const;
 
-// フィルター状態の型
-interface RelatedFilterState {
-  statuses: AnnouncementStatus[];
-  bidTypes: string[];
-  categories: string[];
-  prefectures: string[];
-  organizations: string[];
-}
-
 // ステータスオプション
 const STATUS_OPTIONS: AnnouncementStatus[] = ['upcoming', 'ongoing', 'awaiting_result', 'closed'];
 
-// ステータス順序（ソート用）
-const STATUS_ORDER: Record<AnnouncementStatus, number> = {
-  upcoming: 0,
-  ongoing: 1,
-  awaiting_result: 2,
-  closed: 3,
-};
-
-const getStatusOrderValue = (status?: string) => STATUS_ORDER[resolveAnnouncementStatus(status)] ?? 0;
-
-// 着手企業用フィルター状態の型
-interface CompanyFilterState {
-  evaluationStatuses: EvaluationStatus[];
-  workStatuses: ('in_progress' | 'completed')[];
-  priorities: (1 | 2 | 3 | 4 | 5)[];
-}
-
 // 参加可否オプション
 const EVALUATION_STATUS_OPTIONS: EvaluationStatus[] = ['all_met', 'other_only_unmet', 'unmet'];
-
-// 参加可否順序（ソート用）
-const EVALUATION_STATUS_ORDER: Record<EvaluationStatus, number> = {
-  all_met: 0,
-  other_only_unmet: 1,
-  unmet: 2,
-};
 
 // 着手状況オプション
 const WORK_STATUS_OPTIONS: Extract<WorkStatus, 'in_progress' | 'completed'>[] = ['in_progress', 'completed'];
 
 // 優先度オプション
 const PRIORITY_OPTIONS: CompanyPriority[] = [1, 2, 3, 4, 5];
-
-// 優先度順序（ソート用）
-const PRIORITY_ORDER: Record<CompanyPriority, number> = {
-  1: 1,
-  2: 2,
-  3: 3,
-  4: 4,
-  5: 5,
-};
-
-// 作業ステータス順序（ソート用）
-const WORK_STATUS_ORDER: Record<Extract<WorkStatus, 'in_progress' | 'completed'>, number> = {
-  in_progress: 0,
-  completed: 1,
-};
-
-const normalizePriority = (value: number): CompanyPriority => {
-  const rounded = Math.round(value);
-  return (PRIORITY_OPTIONS.includes(rounded as CompanyPriority) ? rounded : 1) as CompanyPriority;
-};
-
-const normalizeWorkStatus = (value: string): Extract<WorkStatus, 'in_progress' | 'completed'> => {
-  return value === 'completed' ? 'completed' : 'in_progress';
-};
 
 // 関連案件用表示条件パネル
 interface RelatedConditionsPanelProps {
@@ -1202,74 +1143,10 @@ export default function AnnouncementDetailPage() {
     } catch { /* ignore */ }
   }, [location.pathname]);
 
-  // 関連案件用の状態
-  const [relatedSearchQuery, setRelatedSearchQuery] = useState('');
-  const [relatedSortOption, setRelatedSortOption] = useState<SortOption | null>(null);
-  const [relatedFilters, setRelatedFilters] = useState<RelatedFilterState>({
-    statuses: [],
-    bidTypes: [],
-    categories: [],
-    prefectures: [],
-    organizations: [],
-  });
-  const [relatedPage, setRelatedPage] = useState(0);
-  const relatedPageSize = 25;
-
-  // 着手企業用の状態
-  const [companySearchQuery, setCompanySearchQuery] = useState('');
-  const [companySortOption, setCompanySortOption] = useState<CompanySortOption | null>(null);
-  const [companyFilters, setCompanyFilters] = useState<CompanyFilterState>({
-    evaluationStatuses: [],
-    workStatuses: [],
-    priorities: [],
-  });
-  const [companyPage, setCompanyPage] = useState(0);
-  const companyPageSize = 25;
-  const [progressingCompanies, setProgressingCompanies] = useState<ProgressingCompany[]>([]);
-  const [isProgressingLoading, setIsProgressingLoading] = useState(false);
-
   // API からデータ取得
   const [announcement, setAnnouncement] = useState<AnnouncementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [documentPreviewState, setDocumentPreviewState] = useState<Record<string, PreviewState>>({});
-  const previewUrlRef = useRef<Record<string, string>>({});
-  const documentPreviewStateRef = useRef<Record<string, PreviewState>>({});
-  const previewFetchControllersRef = useRef<Record<string, AbortController>>({});
-  const abortAllPreviewFetches = useCallback(() => {
-    Object.values(previewFetchControllersRef.current).forEach((controller) => {
-      controller.abort();
-    });
-    previewFetchControllersRef.current = {};
-  }, []);
-  const revokeAllPreviewUrls = useCallback(() => {
-    Object.values(previewUrlRef.current).forEach((url) => {
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
-    });
-    previewUrlRef.current = {};
-  }, []);
-
-  const resetPreviewState = useCallback(() => {
-    abortAllPreviewFetches();
-    revokeAllPreviewUrls();
-    setDocumentPreviewState(() => {
-      documentPreviewStateRef.current = {};
-      return {};
-    });
-  }, [abortAllPreviewFetches, revokeAllPreviewUrls]);
-
-  useEffect(() => {
-    return () => {
-      abortAllPreviewFetches();
-      revokeAllPreviewUrls();
-    };
-  }, [abortAllPreviewFetches, revokeAllPreviewUrls]);
-
-  useEffect(() => {
-    resetPreviewState();
-  }, [announcement?.announcementNo, resetPreviewState]);
 
   useEffect(() => {
     const fetchAnnouncement = async () => {
@@ -1294,147 +1171,44 @@ export default function AnnouncementDetailPage() {
     fetchAnnouncement();
   }, [id]);
 
-  const loadPdfPreview = useCallback(
-    async (documentId: number, options?: { force?: boolean }) => {
-      if (!announcement?.announcementNo) return;
-      const docKey = String(documentId);
-      const forceReload = options?.force ?? false;
-      const currentState = documentPreviewStateRef.current[docKey];
-      if (!forceReload && (currentState?.loading || currentState?.url)) {
-        return;
-      }
-
-      if (forceReload && previewUrlRef.current[docKey]) {
-        URL.revokeObjectURL(previewUrlRef.current[docKey]);
-        delete previewUrlRef.current[docKey];
-      }
-
-      const existingController = previewFetchControllersRef.current[docKey];
-      if (existingController) {
-        existingController.abort();
-      }
-
-      const controller = new AbortController();
-      previewFetchControllersRef.current[docKey] = controller;
-
-      setDocumentPreviewState((prev) => {
-        const nextState = {
-          ...prev,
-          [docKey]: { loading: true },
-        };
-        documentPreviewStateRef.current = nextState;
-        return nextState;
-      });
-
-      try {
-        const response = await fetch(
-          getApiUrl(`/api/announcements/${announcement.announcementNo}/documents/${docKey}/preview`),
-          { signal: controller.signal }
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch preview (${response.status})`);
-        }
-        const blob = await response.blob();
-        if (controller.signal.aborted) {
-          return;
-        }
-        const objectUrl = URL.createObjectURL(blob);
-
-        if (previewUrlRef.current[docKey]) {
-          URL.revokeObjectURL(previewUrlRef.current[docKey]);
-        }
-        previewUrlRef.current[docKey] = objectUrl;
-
-        setDocumentPreviewState((prev) => {
-          const nextState = {
-            ...prev,
-            [docKey]: { loading: false, url: objectUrl },
-          };
-          documentPreviewStateRef.current = nextState;
-          return nextState;
-        });
-      } catch (err) {
-        if ((err instanceof DOMException && err.name === 'AbortError') || controller.signal.aborted) {
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'PDFプレビューの取得に失敗しました';
-        setDocumentPreviewState((prev) => {
-          const nextState = {
-            ...prev,
-            [docKey]: { loading: false, error: message },
-          };
-          documentPreviewStateRef.current = nextState;
-          return nextState;
-        });
-      } finally {
-        if (previewFetchControllersRef.current[docKey] === controller) {
-          delete previewFetchControllersRef.current[docKey];
-        }
-      }
-    },
-    [announcement?.announcementNo]
+  // Composed hooks
+  const { documentPreviewState, loadPdfPreview } = useDocumentPreview(
+    announcement?.announcementNo,
+    announcement?.documents,
   );
 
-  useEffect(() => {
-    if (!announcement?.documents) return;
-    const firstPdfDoc = announcement.documents.find(
-      (doc: DocumentOcr) => doc.fileFormat && doc.fileFormat.toLowerCase() === 'pdf'
-    );
-    if (firstPdfDoc) {
-      loadPdfPreview(firstPdfDoc.id);
-    }
-  }, [announcement?.documents, loadPdfPreview]);
+  const {
+    searchQuery: relatedSearchQuery,
+    handleSearchChange: handleRelatedSearchChange,
+    sortOption: relatedSortOption,
+    setSortOption: setRelatedSortOption,
+    filters: relatedFilters,
+    setFilters: setRelatedFilters,
+    page: relatedPage,
+    setPage: setRelatedPage,
+    pageSize: relatedPageSize,
+    baseRelatedAnnouncements,
+    filteredAnnouncements: filteredRelatedAnnouncements,
+    paginatedAnnouncements: paginatedRelatedAnnouncements,
+    clear: clearRelated,
+  } = useRelatedAnnouncements(announcement?.announcementNo);
 
-  useEffect(() => {
-    if (!announcement || !announcement.announcementNo) {
-      setProgressingCompanies([]);
-      return;
-    }
-
-    let isCancelled = false;
-
-    const fetchProgressingCompanies = async () => {
-      setIsProgressingLoading(true);
-      try {
-        const response = await fetch(
-          getApiUrl(`/api/announcements/${announcement.announcementNo}/progressing-companies`)
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch progressing companies: ${response.status}`);
-        }
-        const data = await response.json();
-        if (isCancelled) return;
-        const mapped = Array.isArray(data)
-          ? data.map((row: any) => ({
-              companyId: String(row.companyId ?? ''),
-              companyName: row.companyName ?? '',
-              branchId: String(row.branchId ?? ''),
-              branchName: row.branchName ?? '',
-              priority: normalizePriority(Number(row.priority ?? 1)),
-              workStatus: normalizeWorkStatus(row.workStatus ?? ''),
-              evaluationId: String(row.evaluationId ?? ''),
-              evaluationStatus: (row.evaluationStatus ?? 'unmet') as EvaluationStatus,
-            }))
-          : [];
-        setProgressingCompanies(mapped);
-      } catch (err) {
-        console.error('Failed to fetch progressing companies:', err);
-        if (!isCancelled) {
-          setProgressingCompanies([]);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsProgressingLoading(false);
-        }
-      }
-    };
-
-    fetchProgressingCompanies();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [announcement?.announcementNo]);
+  const {
+    searchQuery: companySearchQuery,
+    handleSearchChange: handleCompanySearchChange,
+    sortOption: companySortOption,
+    setSortOption: setCompanySortOption,
+    filters: companyFilters,
+    setFilters: setCompanyFilters,
+    page: companyPage,
+    setPage: setCompanyPage,
+    pageSize: companyPageSize,
+    companies: progressingCompanies,
+    isLoading: isProgressingLoading,
+    filteredCompanies: filteredProgressingCompanies,
+    paginatedCompanies: paginatedProgressingCompanies,
+    clear: clearCompany,
+  } = useProgressingCompanies(announcement?.announcementNo);
 
   // サイドパネル制御
   const handleOpenWithTab = useCallback((tab: 'sort' | 'filter') => {
@@ -1443,150 +1217,6 @@ export default function AnnouncementDetailPage() {
       toggleRightPanel();
     }
   }, [rightPanelOpen, toggleRightPanel]);
-
-  // 検索変更ハンドラ
-  const handleRelatedSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setRelatedSearchQuery(e.target.value);
-    setRelatedPage(0);
-  }, []);
-
-  // 企業検索変更ハンドラ
-  const handleCompanySearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setCompanySearchQuery(e.target.value);
-    setCompanyPage(0);
-  }, []);
-
-  // 関連案件のベースデータ（メモ化）
-  // TODO: 関連案件APIを実装後に復活
-  const baseRelatedAnnouncements = useMemo((): any[] => {
-    return [];
-  }, [announcement]);
-
-  // フィルタリング・ソート済み関連案件
-  const filteredRelatedAnnouncements = useMemo(() => {
-    let filtered = baseRelatedAnnouncements;
-
-    // 検索フィルター
-    if (relatedSearchQuery) {
-      const query = relatedSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (a) =>
-          a.title.toLowerCase().includes(query) ||
-          a.category.toLowerCase().includes(query) ||
-          a.workLocation.toLowerCase().includes(query)
-      );
-    }
-
-    // フィルター適用
-    filtered = filtered.filter((a) => {
-      if (relatedFilters.statuses.length > 0 && !relatedFilters.statuses.includes(resolveAnnouncementStatus(a.status as string | undefined))) return false;
-      if (relatedFilters.bidTypes.length > 0 && (!a.bidType || !relatedFilters.bidTypes.includes(a.bidType))) return false;
-      if (relatedFilters.categories.length > 0 && !relatedFilters.categories.includes(a.category)) return false;
-      if (relatedFilters.prefectures.length > 0) {
-        const prefecture = a.workLocation?.match(/^(.+?[都道府県])/)?.[1] || '';
-        if (!relatedFilters.prefectures.includes(prefecture)) return false;
-      }
-      if (relatedFilters.organizations.length > 0) {
-        const orgGroup = getOrganizationGroup(a.organization);
-        if (!relatedFilters.organizations.includes(orgGroup)) return false;
-      }
-      return true;
-    });
-
-    // ソート適用
-    if (!relatedSortOption) return filtered;
-
-    return [...filtered].sort((a, b) => {
-      switch (relatedSortOption) {
-        case 'deadline_asc':
-          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-        case 'deadline_desc':
-          return new Date(b.deadline).getTime() - new Date(a.deadline).getTime();
-        case 'publish_asc':
-          return new Date(a.publishDate).getTime() - new Date(b.publishDate).getTime();
-        case 'publish_desc':
-          return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
-        case 'status_asc':
-          return getStatusOrderValue(a.status as string | undefined) - getStatusOrderValue(b.status as string | undefined);
-        case 'status_desc':
-          return getStatusOrderValue(b.status as string | undefined) - getStatusOrderValue(a.status as string | undefined);
-        case 'prefecture_asc': {
-          const prefA = a.workLocation?.match(/^(.+?[都道府県])/)?.[1] || '';
-          const prefB = b.workLocation?.match(/^(.+?[都道府県])/)?.[1] || '';
-          return prefA.localeCompare(prefB, 'ja');
-        }
-        case 'prefecture_desc': {
-          const prefA = a.workLocation?.match(/^(.+?[都道府県])/)?.[1] || '';
-          const prefB = b.workLocation?.match(/^(.+?[都道府県])/)?.[1] || '';
-          return prefB.localeCompare(prefA, 'ja');
-        }
-        default:
-          return 0;
-      }
-    });
-  }, [baseRelatedAnnouncements, relatedSearchQuery, relatedFilters, relatedSortOption]);
-
-  // ページネーション済み関連案件
-  const paginatedRelatedAnnouncements = useMemo(() => {
-    const start = relatedPage * relatedPageSize;
-    return filteredRelatedAnnouncements.slice(start, start + relatedPageSize);
-  }, [filteredRelatedAnnouncements, relatedPage]);
-
-  // 関連データ（早期returnの前に計算）
-  // フィルタリング・ソート済み着手企業
-  const filteredProgressingCompanies = useMemo<ProgressingCompany[]>(() => {
-    let filtered = progressingCompanies;
-
-    // 検索フィルター
-    if (companySearchQuery) {
-      const query = companySearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.companyName.toLowerCase().includes(query) ||
-          c.branchName.toLowerCase().includes(query)
-      );
-    }
-
-    // フィルター適用
-    filtered = filtered.filter((c) => {
-      if (companyFilters.evaluationStatuses.length > 0 && !companyFilters.evaluationStatuses.includes(c.evaluationStatus)) return false;
-      if (companyFilters.workStatuses.length > 0 && !companyFilters.workStatuses.includes(c.workStatus)) return false;
-      if (companyFilters.priorities.length > 0 && !companyFilters.priorities.includes(c.priority)) return false;
-      return true;
-    });
-
-    // ソート適用
-    if (!companySortOption) return filtered;
-
-    return [...filtered].sort((a, b) => {
-      switch (companySortOption) {
-        case 'priority_asc':
-          return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-        case 'priority_desc':
-          return PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority];
-        case 'evaluationStatus_asc':
-          return EVALUATION_STATUS_ORDER[a.evaluationStatus] - EVALUATION_STATUS_ORDER[b.evaluationStatus];
-        case 'evaluationStatus_desc':
-          return EVALUATION_STATUS_ORDER[b.evaluationStatus] - EVALUATION_STATUS_ORDER[a.evaluationStatus];
-        case 'workStatus_asc':
-          return WORK_STATUS_ORDER[a.workStatus] - WORK_STATUS_ORDER[b.workStatus];
-        case 'workStatus_desc':
-          return WORK_STATUS_ORDER[b.workStatus] - WORK_STATUS_ORDER[a.workStatus];
-        case 'company_asc':
-          return a.companyName.localeCompare(b.companyName, 'ja');
-        case 'company_desc':
-          return b.companyName.localeCompare(a.companyName, 'ja');
-        default:
-          return 0;
-      }
-    });
-  }, [progressingCompanies, companySearchQuery, companyFilters, companySortOption]);
-
-  // ページネーション済み着手企業
-  const paginatedProgressingCompanies = useMemo<ProgressingCompany[]>(() => {
-    const start = companyPage * companyPageSize;
-    return filteredProgressingCompanies.slice(start, start + companyPageSize);
-  }, [filteredProgressingCompanies, companyPage, companyPageSize]);
 
   if (loading) {
     return (
@@ -1794,18 +1424,7 @@ export default function AnnouncementDetailPage() {
                   onSortChange={setRelatedSortOption}
                   filters={relatedFilters}
                   onFilterChange={setRelatedFilters}
-                  onClearAll={() => {
-                    setRelatedSearchQuery('');
-                    setRelatedSortOption(null);
-                    setRelatedFilters({
-                      statuses: [],
-                      bidTypes: [],
-                      categories: [],
-                      prefectures: [],
-                      organizations: [],
-                    });
-                    setRelatedPage(0);
-                  }}
+                  onClearAll={clearRelated}
                   activeTab={conditionTab}
                   onTabChange={setConditionTab}
                 />
@@ -1817,16 +1436,7 @@ export default function AnnouncementDetailPage() {
                   onSortChange={setCompanySortOption}
                   filters={companyFilters}
                   onFilterChange={setCompanyFilters}
-                  onClearAll={() => {
-                    setCompanySearchQuery('');
-                    setCompanySortOption(null);
-                    setCompanyFilters({
-                      evaluationStatuses: [],
-                      workStatuses: [],
-                      priorities: [],
-                    });
-                    setCompanyPage(0);
-                  }}
+                  onClearAll={clearCompany}
                   activeTab={conditionTab}
                   onTabChange={setConditionTab}
                 />

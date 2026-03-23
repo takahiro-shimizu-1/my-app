@@ -23,7 +23,7 @@ export class ContactRepository {
       const result = await client.query(
         `SELECT contact_id::text AS id, COALESCE(contact_name, '') AS name,
                 COALESCE(contact_email, '') AS email, COALESCE(contact_telephone, '') AS phone
-         FROM ${table()} WHERE contact_id::text = $1`,
+         FROM ${table()} WHERE contact_id = $1::integer`,
         [id]
       );
       return result.rowCount === 0 ? null : result.rows[0];
@@ -55,7 +55,7 @@ export class ContactRepository {
          SET contact_name = COALESCE($2, contact_name),
              contact_email = COALESCE($3, contact_email),
              contact_telephone = COALESCE($4, contact_telephone)
-         WHERE contact_id::text = $1
+         WHERE contact_id = $1::integer
          RETURNING contact_id::text AS id, contact_name AS name, contact_email AS email, contact_telephone AS phone`,
         [id, name, email, phone]
       );
@@ -69,7 +69,7 @@ export class ContactRepository {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        `DELETE FROM ${table()} WHERE contact_id::text = $1 RETURNING contact_id::text AS id`,
+        `DELETE FROM ${table()} WHERE contact_id = $1::integer RETURNING contact_id::text AS id`,
         [id]
       );
       return result.rowCount === 0 ? null : result.rows[0];

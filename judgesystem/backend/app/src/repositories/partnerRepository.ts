@@ -27,7 +27,7 @@ export class PartnerRepository {
         `SELECT p.partner_no::text AS id, p.partner_no AS no, COALESCE(p.partner_name, '') AS name,
                 COALESCE(p.partner_address, '') AS address, COALESCE(p.partner_telephone, '') AS phone,
                 COALESCE(p.partner_email, '') AS email
-         FROM ${schemaPrefix}${TABLES.partners} p WHERE p.partner_no::text = $1`,
+         FROM ${schemaPrefix}${TABLES.partners} p WHERE p.partner_no = $1::integer`,
         [id]
       );
       return result.rowCount === 0 ? null : result.rows[0];

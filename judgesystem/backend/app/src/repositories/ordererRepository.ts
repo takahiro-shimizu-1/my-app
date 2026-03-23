@@ -26,7 +26,7 @@ export class OrdererRepository {
       const result = await client.query(
         `SELECT orderer_id::text AS id, COALESCE(orderer_name, '') AS name, COALESCE(orderer_address, '') AS address,
                 COALESCE(orderer_telephone, '') AS phone
-         FROM ${schemaPrefix}${TABLES.orderers} WHERE orderer_id::text = $1`,
+         FROM ${schemaPrefix}${TABLES.orderers} WHERE orderer_id = $1::integer`,
         [id]
       );
       return result.rowCount === 0 ? null : result.rows[0];

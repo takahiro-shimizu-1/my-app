@@ -275,13 +275,13 @@ export class EvaluationRepository {
           evs."currentStep" AS "currentStep",
           cbj."updatedDate" AS "evaluatedAt"
         ${baseFromClause}
-        LEFT JOIN documents doc ON doc.announcement_id::text = cbj.announcement_no::text
-        LEFT JOIN competing_companies companies ON companies.announcement_id::text = cbj.announcement_no::text
+        LEFT JOIN documents doc ON doc.announcement_id = cbj.announcement_no
+        LEFT JOIN competing_companies companies ON companies.announcement_id = cbj.announcement_no
         LEFT JOIN requirement_details req
-          ON req.announcement_no::text = cbj.announcement_no::text
-         AND COALESCE(req.office_no::text, '-1') = COALESCE(cbj.office_no::text, '-1')
-        LEFT JOIN step_assignees sa ON sa.evaluation_no::text = cbj.evaluation_no::text
-        WHERE cbj.evaluation_no::text = $1
+          ON req.announcement_no = cbj.announcement_no
+         AND COALESCE(req.office_no, -1) = COALESCE(cbj.office_no, -1)
+        LEFT JOIN step_assignees sa ON sa.evaluation_no = cbj.evaluation_no
+        WHERE cbj.evaluation_no = $1::integer
         `,
         [id]
       );
@@ -492,7 +492,7 @@ export class EvaluationRepository {
       const result = await client.query(
         `SELECT step_id AS "stepId", contact_id::text AS "staffId", assigned_at AS "assignedAt"
          FROM ${schemaPrefix}${TABLES.evaluationAssignees}
-         WHERE evaluation_no::text = $1
+         WHERE evaluation_no = $1::integer
          ORDER BY step_id`,
         [evaluationNo]
       );
@@ -548,10 +548,10 @@ export class EvaluationRepository {
   private getBaseFromClause(tables: QualifiedTables): string {
     return `
       FROM ${tables.companyBidJudgement} cbj
-      JOIN ${tables.bidAnnouncements} ba ON ba.announcement_no::text = cbj.announcement_no::text
-      JOIN ${tables.companyMaster} cm ON cm.company_no::text = cbj.company_no::text
-      LEFT JOIN ${tables.officeMaster} om ON om.office_no::text = cbj.office_no::text
-      LEFT JOIN ${tables.announcementsEstimatedAmounts} aea ON aea.announcement_no::text = cbj.announcement_no::text
+      JOIN ${tables.bidAnnouncements} ba ON ba.announcement_no = cbj.announcement_no
+      JOIN ${tables.companyMaster} cm ON cm.company_no = cbj.company_no
+      LEFT JOIN ${tables.officeMaster} om ON om.office_no = cbj.office_no
+      LEFT JOIN ${tables.announcementsEstimatedAmounts} aea ON aea.announcement_no = cbj.announcement_no
       LEFT JOIN ${tables.evaluationStatuses} evs ON evs."evaluationNo" = cbj.evaluation_no::text
     `;
   }

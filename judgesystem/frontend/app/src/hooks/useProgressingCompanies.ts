@@ -1,0 +1,169 @@
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { getApiUrl } from '../config/api';
+import type { ProgressingCompany } from '../components/announcement';
+import type { EvaluationStatus, WorkStatus, CompanyPriority } from '../types';
+
+// -- Types --
+
+export type CompanySortOption =
+  | 'priority_asc' | 'priority_desc'
+  | 'workStatus_asc' | 'workStatus_desc'
+  | 'company_asc' | 'company_desc'
+  | 'evaluationStatus_asc' | 'evaluationStatus_desc';
+
+export interface CompanyFilterState {
+  evaluationStatuses: EvaluationStatus[];
+  workStatuses: ('in_progress' | 'completed')[];
+  priorities: (1 | 2 | 3 | 4 | 5)[];
+}
+
+// -- Constants --
+
+const EVALUATION_STATUS_ORDER: Record<EvaluationStatus, number> = {
+  all_met: 0,
+  other_only_unmet: 1,
+  unmet: 2,
+};
+
+const WORK_STATUS_ORDER: Record<Extract<WorkStatus, 'in_progress' | 'completed'>, number> = {
+  in_progress: 0,
+  completed: 1,
+};
+
+const PRIORITY_ORDER: Record<CompanyPriority, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+
+const normalizePriority = (value: number): CompanyPriority => {
+  const rounded = Math.round(value);
+  return ([1, 2, 3, 4, 5].includes(rounded) ? rounded : 1) as CompanyPriority;
+};
+
+const normalizeWorkStatus = (value: string): Extract<WorkStatus, 'in_progress' | 'completed'> =>
+  value === 'completed' ? 'completed' : 'in_progress';
+
+// -- Hook --
+
+/**
+ * Progressing companies hook.
+ * Fetches progressing companies from the API and provides
+ * search / filter / sort / pagination capabilities.
+ *
+ * @param announcementNo - The announcement number used in the API path.
+ * @returns Company state and handlers.
+ */
+export function useProgressingCompanies(announcementNo: string | undefined) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<CompanySortOption | null>(null);
+  const [filters, setFilters] = useState<CompanyFilterState>({
+    evaluationStatuses: [], workStatuses: [], priorities: [],
+  });
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
+
+  const [companies, setCompanies] = useState<ProgressingCompany[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch from API
+  useEffect(() => {
+    if (!announcementNo) { setCompanies([]); return; }
+    let isCancelled = false;
+    const fetchProgressingCompanies = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(
+          getApiUrl(`/api/announcements/${announcementNo}/progressing-companies`),
+        );
+        if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+        const data = await response.json();
+        if (isCancelled) return;
+        setCompanies(
+          Array.isArray(data)
+            ? data.map((row: any) => ({
+                companyId: String(row.companyId ?? ''),
+                companyName: row.companyName ?? '',
+                branchId: String(row.branchId ?? ''),
+                branchName: row.branchName ?? '',
+                priority: normalizePriority(Number(row.priority ?? 1)),
+                workStatus: normalizeWorkStatus(row.workStatus ?? ''),
+                evaluationId: String(row.evaluationId ?? ''),
+                evaluationStatus: (row.evaluationStatus ?? 'unmet') as EvaluationStatus,
+              }))
+            : [],
+        );
+      } catch (err) {
+        console.error('Failed to fetch progressing companies:', err);
+        if (!isCancelled) setCompanies([]);
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    };
+    fetchProgressingCompanies();
+    return () => { isCancelled = true; };
+  }, [announcementNo]);
+
+  // Search handler
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setPage(0);
+  }, []);
+
+  // Filtered + sorted list
+  const filteredCompanies = useMemo<ProgressingCompany[]>(() => {
+    let filtered = companies;
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c =>
+        c.companyName.toLowerCase().includes(query) || c.branchName.toLowerCase().includes(query),
+      );
+    }
+
+    filtered = filtered.filter(c => {
+      if (filters.evaluationStatuses.length > 0 && !filters.evaluationStatuses.includes(c.evaluationStatus)) return false;
+      if (filters.workStatuses.length > 0 && !filters.workStatuses.includes(c.workStatus)) return false;
+      if (filters.priorities.length > 0 && !filters.priorities.includes(c.priority)) return false;
+      return true;
+    });
+
+    if (!sortOption) return filtered;
+    return [...filtered].sort((a, b) => {
+      switch (sortOption) {
+        case 'priority_asc': return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+        case 'priority_desc': return PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority];
+        case 'evaluationStatus_asc': return EVALUATION_STATUS_ORDER[a.evaluationStatus] - EVALUATION_STATUS_ORDER[b.evaluationStatus];
+        case 'evaluationStatus_desc': return EVALUATION_STATUS_ORDER[b.evaluationStatus] - EVALUATION_STATUS_ORDER[a.evaluationStatus];
+        case 'workStatus_asc': return WORK_STATUS_ORDER[a.workStatus] - WORK_STATUS_ORDER[b.workStatus];
+        case 'workStatus_desc': return WORK_STATUS_ORDER[b.workStatus] - WORK_STATUS_ORDER[a.workStatus];
+        case 'company_asc': return a.companyName.localeCompare(b.companyName, 'ja');
+        case 'company_desc': return b.companyName.localeCompare(a.companyName, 'ja');
+        default: return 0;
+      }
+    });
+  }, [companies, searchQuery, filters, sortOption]);
+
+  // Paginated slice
+  const paginatedCompanies = useMemo<ProgressingCompany[]>(() => {
+    const start = page * pageSize;
+    return filteredCompanies.slice(start, start + pageSize);
+  }, [filteredCompanies, page]);
+
+  // Clear all conditions
+  const clear = useCallback(() => {
+    setSearchQuery('');
+    setSortOption(null);
+    setFilters({ evaluationStatuses: [], workStatuses: [], priorities: [] });
+    setPage(0);
+  }, []);
+
+  return {
+    searchQuery, setSearchQuery,
+    sortOption, setSortOption,
+    filters, setFilters,
+    page, setPage, pageSize,
+    companies, isLoading,
+    filteredCompanies,
+    paginatedCompanies,
+    total: filteredCompanies.length,
+    handleSearchChange,
+    clear,
+  };
+}
