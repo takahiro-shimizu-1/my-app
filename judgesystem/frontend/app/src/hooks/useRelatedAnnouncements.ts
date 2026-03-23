@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { resolveAnnouncementStatus } from '../components/announcement';
 import { getOrganizationGroup } from '../constants/organizations';
-import { getApiUrl } from '../config/api';
+import { fetchRelatedAnnouncements as fetchRelatedAnnouncementsApi } from '../data/api';
 import type { AnnouncementStatus } from '../types/announcement';
 
 // -- Related announcement row returned by the API --
@@ -78,17 +78,14 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
     let isCancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
-    const fetchRelated = async () => {
+    const loadRelated = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(
-          getApiUrl(`/api/announcements/${announcementNo}/related`),
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-        const data = await response.json();
-        if (!isCancelled) setBaseRelatedAnnouncements(Array.isArray(data) ? data : []);
+        const data = await fetchRelatedAnnouncementsApi(announcementNo, {
+          signal: controller.signal,
+        });
+        if (!isCancelled) setBaseRelatedAnnouncements(data as RelatedAnnouncement[]);
       } catch (err) {
         if (!isCancelled) {
           if (err instanceof DOMException && err.name === 'AbortError') {
@@ -103,7 +100,7 @@ export function useRelatedAnnouncements(announcementNo: string | undefined) {
         if (!isCancelled) setIsLoading(false);
       }
     };
-    fetchRelated();
+    loadRelated();
     return () => { isCancelled = true; clearTimeout(timeoutId); controller.abort(); };
   }, [announcementNo]);
 

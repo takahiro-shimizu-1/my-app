@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getApiUrl } from '../config/api';
 import type { AnnouncementDetail } from '../components/announcement';
+import { fetchAnnouncementDetail } from '../data/api';
 import { useDocumentPreview } from './useDocumentPreview';
 import { useRelatedAnnouncements } from './useRelatedAnnouncements';
 import { useProgressingCompanies } from './useProgressingCompanies';
@@ -35,22 +35,21 @@ export function useAnnouncementDetail() {
 
   // Fetch announcement
   useEffect(() => {
-    const fetchAnnouncement = async () => {
+    const loadAnnouncement = async () => {
       if (!id) return;
       setLoading(true);
       setError(null);
       try {
         const announcementNo = id.startsWith('ann-') ? id.substring(4) : id;
-        const response = await fetch(getApiUrl(`/api/announcements/${announcementNo}`));
-        if (!response.ok) throw new Error(`Failed to fetch announcement: ${response.status}`);
-        setAnnouncement(await response.json());
+        const data = await fetchAnnouncementDetail(announcementNo);
+        setAnnouncement(data as AnnouncementDetail);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
     };
-    fetchAnnouncement();
+    loadAnnouncement();
   }, [id]);
 
   // Composed hooks
