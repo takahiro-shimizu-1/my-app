@@ -144,7 +144,7 @@ def checkAllMinistryUnified(requiredItems, agencyMap, officeLicenses, constructi
         if len(matchingLicenses) == 0:
             return {
                 "is_ok": False,
-                "reason": fr"業種・等級要件：全省庁統一資格で必要な営業品目({"、".join(requiredItems)})を保有していません"
+                "reason": fr"業種・等級要件：全省庁統一資格で必要な営業品目({'、'.join(requiredItems)})を保有していません"
             }
 
         if requiredGrade:
@@ -224,7 +224,7 @@ def checkSpecificAgency(agency, agencyMap, officeLicenses, constructionMap, requ
         if len(matchingLicenses) == 0:
             return {
                 "is_ok": False,
-                "reason": fr"業種・等級要件：{agency}資格で必要な営業品目({"、".join(requiredItems)})を保有していません"
+                "reason": fr"業種・等級要件：{agency}資格で必要な営業品目({'、'.join(requiredItems)})を保有していません"
             }
 
         if requiredGrade:
@@ -285,7 +285,7 @@ def checkDefault(requiredItems, officeLicenses, constructionMap, agencyMap, requ
         if len(matchingLicenses) == 0:
             return {
                 "is_ok": False,
-                "reason": fr"業種・等級要件：必要な営業品目({"、".join(requiredItems)})を保有していません"
+                "reason": fr"業種・等級要件：必要な営業品目({'、'.join(requiredItems)})を保有していません"
             }
 
         if requiredGrade:
@@ -328,7 +328,7 @@ def checkDefault(requiredItems, officeLicenses, constructionMap, agencyMap, requ
                 continue
 
             if not isinstance(agInfo["agency_area"], str):
-                print(fr"agInfo['agency_area'] not str : {agInfo["agency_area"]}")
+                print(f"agInfo['agency_area'] not str : {agInfo['agency_area']}")
                 agInfo["agency_area"] = str(agInfo["agency_area"])
                 # time.sleep(5)
 
@@ -342,7 +342,7 @@ def checkDefault(requiredItems, officeLicenses, constructionMap, agencyMap, requ
         if len(areaLicenses) == 0:
             return {
                 "is_ok": False,
-                "reason": fr"業種・等級要件：必要な地域({"、".join(requiredAreas)})の登録がありません"
+                "reason": fr"業種・等級要件：必要な地域({'、'.join(requiredAreas)})の登録がありません"
             }
 
     return {
